@@ -1,0 +1,50 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { api, queryString } from '../api'
+import { Empty, ErrorMessage, Loading } from '../components/Status'
+import { LANGUAGES, MASTERY } from '../constants'
+
+export default function SentenceLibrary() {
+  const [filters, setFilters] = useState({ q: '', language: '', mastery: '', tag: '' })
+  const [items, setItems] = useState([])
+  const [tags, setTags] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    api.get(`/sentences${queryString(filters)}`).then(setItems).catch((err) => setError(err.message)).finally(() => setLoading(false))
+  }
+  useEffect(load, [filters.q, filters.language, filters.mastery, filters.tag])
+  useEffect(() => { api.get('/tags?kind=sentence').then(setTags).catch(() => {}) }, [])
+
+  const remove = async (event, item) => {
+    event.preventDefault(); event.stopPropagation()
+    if (!window.confirm(`确定删除这句话吗？\n${item.target_text}`)) return
+    await api.delete(`/sentences/${item.id}`); load()
+  }
+
+  return (
+    <div>
+      <div className="library-header"><div className="page-title"><p className="eyebrow">SENTENCE LIBRARY</p><h1>句子库</h1><p>每一句，都是你真正想说的话。</p></div><Link className="button button-primary" to="/sentences/new">＋ 添加句子</Link></div>
+      <div className="filterbar">
+        <label className="search"><span>⌕</span><input aria-label="搜索句子" placeholder="搜索中文或目标语言…" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} /></label>
+        <select aria-label="语言筛选" value={filters.language} onChange={(e) => setFilters({ ...filters, language: e.target.value })}><option value="">全部语言</option>{Object.entries(LANGUAGES).map(([v, x]) => <option key={v} value={v}>{x.label}</option>)}</select>
+        <select aria-label="标签筛选" value={filters.tag} onChange={(e) => setFilters({ ...filters, tag: e.target.value })}><option value="">全部标签</option>{tags.map((tag) => <option key={tag}>{tag}</option>)}</select>
+        <select aria-label="熟练度筛选" value={filters.mastery} onChange={(e) => setFilters({ ...filters, mastery: e.target.value })}><option value="">全部熟练度</option>{Object.entries(MASTERY).map(([v, x]) => <option key={v} value={v}>{x.label}</option>)}</select>
+      </div>
+      <ErrorMessage message={error} />
+      {loading ? <Loading /> : items.length === 0 ? <Empty title="还没有找到句子">换一个筛选条件，或添加第一句想说的话。</Empty> : (
+        <div className="sentence-list">
+          {items.map((item, index) => <Link className="sentence-row" to={`/sentences/${item.id}`} key={item.id}>
+            <span className="row-index">{String(index + 1).padStart(2, '0')}</span>
+            <div className="sentence-copy"><p>{item.chinese_text}</p><h3 lang={item.language}>{item.target_text}</h3><div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div></div>
+            <div className="row-meta"><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span><small>{LANGUAGES[item.language].label} · 复习 {item.review_count} 次</small><button className="text-danger" onClick={(event) => remove(event, item)}>删除</button></div>
+            <span className="row-arrow">→</span>
+          </Link>)}
+        </div>
+      )}
+    </div>
+  )
+}
+

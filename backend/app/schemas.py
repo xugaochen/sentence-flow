@@ -1,0 +1,146 @@
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+Language = Literal["ja", "es"]
+Mastery = Literal["unknown", "fuzzy", "known"]
+
+
+class TagOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+
+
+class SentenceBase(BaseModel):
+    chinese_text: str = Field(min_length=1)
+    target_text: str = Field(min_length=1)
+    language: Language
+    notes: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("chinese_text", "target_text")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("内容不能为空")
+        return value
+
+    @field_validator("notes")
+    @classmethod
+    def strip_notes(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("tags")
+    @classmethod
+    def clean_tags(cls, values: list[str]) -> list[str]:
+        return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+class SentenceCreate(SentenceBase):
+    mastery: Mastery = "unknown"
+
+
+class SentenceUpdate(SentenceBase):
+    mastery: Mastery
+
+
+class WordBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    word: str
+    meaning: str
+    notes: str
+    part_of_speech: str
+    mastery: str
+
+
+class SentenceBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    chinese_text: str
+    target_text: str
+    language: str
+    notes: str
+
+
+class SentenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    chinese_text: str
+    target_text: str
+    notes: str
+    language: str
+    mastery: str
+    created_at: datetime
+    updated_at: datetime
+    last_reviewed_at: datetime | None
+    review_count: int
+    tags: list[TagOut]
+    words: list[WordBrief] = Field(default_factory=list)
+
+
+class WordBase(BaseModel):
+    word: str = Field(min_length=1)
+    meaning: str = Field(min_length=1)
+    language: Language
+    notes: str = ""
+    part_of_speech: str = "other"
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("word", "meaning", "part_of_speech")
+    @classmethod
+    def strip_fields(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("notes")
+    @classmethod
+    def strip_notes(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("tags")
+    @classmethod
+    def clean_tags(cls, values: list[str]) -> list[str]:
+        return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+class WordCreate(WordBase):
+    mastery: Mastery = "unknown"
+    source_sentence_ids: list[int] = Field(default_factory=list)
+
+
+class WordUpdate(WordBase):
+    mastery: Mastery
+    source_sentence_ids: list[int] = Field(default_factory=list)
+
+
+class WordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    word: str
+    meaning: str
+    notes: str
+    language: str
+    part_of_speech: str
+    mastery: str
+    created_at: datetime
+    updated_at: datetime
+    last_reviewed_at: datetime | None
+    review_count: int
+    tags: list[TagOut]
+    sentences: list[SentenceBrief] = Field(default_factory=list)
+
+
+class ReviewResult(BaseModel):
+    mastery: Mastery
+
+
+class StatsOut(BaseModel):
+    sentence_total: int
+    sentence_ja: int
+    sentence_es: int
+    word_total: int
+    reviewed_today: int
