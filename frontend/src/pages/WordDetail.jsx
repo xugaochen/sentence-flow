@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import TagInput from '../components/TagInput'
 import { ErrorMessage, Loading } from '../components/Status'
 import { formatDate, LANGUAGES, MASTERY, PARTS_OF_SPEECH } from '../constants'
 
 export default function WordDetail() {
-  const { id } = useParams(); const navigate = useNavigate()
+  const { id } = useParams(); const location = useLocation(); const navigate = useNavigate()
   const [item, setItem] = useState(null); const [editing, setEditing] = useState(false); const [error, setError] = useState('')
   const load = () => api.get(`/words/${id}`).then(setItem).catch((err) => setError(err.message))
-  useEffect(load, [id])
+  useEffect(() => {
+    void load()
+  }, [id])
 
   const save = async (event) => {
     event.preventDefault(); setError('')
@@ -29,9 +31,11 @@ export default function WordDetail() {
   if (!item && !error) return <Loading />
   if (!item) return <ErrorMessage message={error} />
   const tagNames = item.tags.map((tag) => typeof tag === 'string' ? tag : tag.name)
+  const fromSentenceId = String(location.state?.fromSentenceId ?? '')
+  const hasSentenceOrigin = /^[1-9]\d*$/.test(fromSentenceId)
 
   return <div className="detail-page word-detail-page">
-    <Link className="back-link" to="/words">← 返回单词库</Link>
+    <Link className="back-link" to={hasSentenceOrigin ? `/sentences/${fromSentenceId}` : '/words'}>{hasSentenceOrigin ? '← 返回刚才的句子' : '← 返回单词库'}</Link>
     <article className="detail-card">
       {!editing ? <>
         <div className="detail-kicker"><span className="language-badge">{LANGUAGES[item.language].short}</span><span>{LANGUAGES[item.language].label} · {item.part_of_speech}</span><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span></div>

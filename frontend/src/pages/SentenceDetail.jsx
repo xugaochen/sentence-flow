@@ -76,7 +76,7 @@ export default function SentenceDetail() {
           <p className="source-note"><b>来源句：</b>{item.target_text}</p>
           <div className="form-actions"><button type="button" className="button button-quiet" onClick={() => setShowWord(false)}>完成</button><button className="button button-quiet" name="nextAction" value="finish" disabled={saving}>{saving ? '保存中…' : '保存并关闭'}</button><button className="button button-primary" name="nextAction" value="continue" disabled={saving}>{saving ? '保存中…' : '保存并继续添加'}</button></div>
         </form>}
-        {item.words.length ? <div className="word-chip-list">{item.words.map((entry) => <Link to={`/words/${entry.id}`} className="word-chip" key={entry.id}><strong>{entry.word}</strong><span>{entry.meaning}</span><small>{entry.part_of_speech}　→</small></Link>)}</div> : <p className="muted-panel">还没有添加单词。只挑那些你真的想主动使用的词。</p>}
+        {item.words.length ? <div className="word-chip-list">{item.words.map((entry) => <Link to={`/words/${entry.id}`} state={{ fromSentenceId: id }} className="word-chip" key={entry.id}><strong>{entry.word}</strong><span>{entry.meaning}</span><small>{entry.part_of_speech}　→</small></Link>)}</div> : <p className="muted-panel">还没有添加单词。只挑那些你真的想主动使用的词。</p>}
       </section>
     </div>
   )

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Layout from './components/Layout'
+import RouteError from './components/RouteError'
 import Home from './pages/Home'
 import SentenceForm from './pages/SentenceForm'
 import SentenceLibrary from './pages/SentenceLibrary'
@@ -14,6 +15,7 @@ import './styles.css'
 const router = createBrowserRouter([
   {
     element: <Layout />,
+    errorElement: <RouteError />,
     children: [
       { path: '/', element: <Home /> },
       { path: '/sentences', element: <SentenceLibrary /> },
