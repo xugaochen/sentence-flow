@@ -1,5 +1,8 @@
 backend/.venv/
 backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+!backend/language_study.db
 backend/**/__pycache__/
 backend/.pytest_cache/
 frontend/node_modules/
@@ -7,4 +10,3 @@ frontend/dist/
 .idea/
 .vscode/
 *.pyc
-

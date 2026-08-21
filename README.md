@@ -17,7 +17,7 @@
 - 单词库的编辑、删除、搜索及语言 / 词性 / 标签 / 熟练度筛选
 - 单词主动输入复习，提交后显示全部来源句及中文语境
 - 首页句子数、语言分布、单词数、今日复习次数统计
-- 无账号、无云端依赖；数据只保存在本机 SQLite 文件中
+- 无账号和运行时云端依赖；应用读取本机 SQLite 文件，数据可通过 Private GitHub 仓库手动同步
 
 ## 技术栈
 
@@ -42,6 +42,7 @@ language_study/
 │  │  ├─ schemas.py          # 请求 / 响应数据结构
 │  │  └─ services.py         # 标签与加权抽样逻辑
 │  ├─ tests/test_api.py       # 核心 API 测试
+│  ├─ language_study.db       # 个人学习数据（仅随 Private 仓库同步）
 │  ├─ requirements.txt
 │  ├─ requirements-dev.txt
 │  └─ seed.py                # 可重复运行的示例数据脚本
@@ -152,7 +153,7 @@ npm run dev
 
 ## SQLite 初始化与示例数据
 
-后端第一次启动时会自动建表，并在 `backend\language_study.db` 创建数据库，不需要手动执行 SQL。
+后端会使用仓库中的 `backend\language_study.db`。如果该文件不存在，第一次启动时会自动创建数据库和数据表，不需要手动执行 SQL。
 
 如果想加入两句日语 / 西班牙语示例和四个关联单词，可在后端环境安装完成后双击：
 
@@ -225,4 +226,14 @@ Vite 通常会提示并自动选择下一个端口，请使用终端中显示的
 
 ### 想备份或迁移数据
 
-关闭后端后复制 `backend\language_study.db` 即可。恢复时把该文件放回相同位置。
+数据库已经纳入 Private GitHub 仓库。提交学习数据前必须先关闭应用，避免在 SQLite 写入过程中复制或提交文件：
+
+```bash
+git add -- backend/language_study.db
+git commit -m "Update study data"
+git push origin main
+```
+
+新机器使用前先执行 `git pull`。不要在两台机器上同时学习后再合并数据库；SQLite 是二进制文件，发生 Git 冲突时不能逐行合并，应保留指定主机器上的完整数据库。
+
+GitHub 同步不能替代独立备份。关闭应用后复制 `backend/language_study.db` 即可备份；恢复时把备份放回相同位置。仓库必须保持 Private，数据库的 `-wal` 和 `-shm` 临时文件不会上传。
