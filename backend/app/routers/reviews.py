@@ -20,7 +20,7 @@ async def sentence_session(
     limit: int | None = Query(10, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Sentence).options(selectinload(Sentence.tags), selectinload(Sentence.words))
+    stmt = select(Sentence).where(Sentence.deleted_at.is_(None)).options(selectinload(Sentence.tags), selectinload(Sentence.words))
     if language:
         stmt = stmt.where(Sentence.language == language)
     if tag:
@@ -31,7 +31,10 @@ async def sentence_session(
 @router.post("/sentences/{sentence_id}", response_model=SentenceOut)
 async def review_sentence(sentence_id: int, payload: ReviewResult, db: Session = Depends(get_db)):
     sentence = db.scalar(
-        select(Sentence).options(selectinload(Sentence.tags), selectinload(Sentence.words)).where(Sentence.id == sentence_id)
+        select(Sentence).options(selectinload(Sentence.tags), selectinload(Sentence.words)).where(
+            Sentence.id == sentence_id,
+            Sentence.deleted_at.is_(None),
+        )
     )
     if sentence is None:
         raise HTTPException(status_code=404, detail="句子不存在")
@@ -52,7 +55,7 @@ async def word_session(
     limit: int | None = Query(10, ge=1, le=1000),
     db: Session = Depends(get_db),
 ):
-    stmt = select(Word).options(selectinload(Word.tags), selectinload(Word.sentences))
+    stmt = select(Word).where(Word.deleted_at.is_(None)).options(selectinload(Word.tags), selectinload(Word.sentences))
     if language:
         stmt = stmt.where(Word.language == language)
     if part_of_speech:
@@ -65,7 +68,10 @@ async def word_session(
 @router.post("/words/{word_id}", response_model=WordOut)
 async def review_word(word_id: int, payload: ReviewResult, db: Session = Depends(get_db)):
     word = db.scalar(
-        select(Word).options(selectinload(Word.tags), selectinload(Word.sentences)).where(Word.id == word_id)
+        select(Word).options(selectinload(Word.tags), selectinload(Word.sentences)).where(
+            Word.id == word_id,
+            Word.deleted_at.is_(None),
+        )
     )
     if word is None:
         raise HTTPException(status_code=404, detail="单词不存在")

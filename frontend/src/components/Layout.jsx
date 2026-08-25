@@ -5,6 +5,7 @@ const nav = [
   ['/review/sentences', '句子复习'],
   ['/sentences', '句子库'],
   ['/words', '单词库'],
+  ['/data', '数据管理'],
 ]
 
 export default function Layout() {
@@ -25,4 +26,3 @@ export default function Layout() {
     </div>
   )
 }
-

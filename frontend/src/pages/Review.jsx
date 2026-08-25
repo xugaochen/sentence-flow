@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, queryString } from '../api'
+import AnswerDiff from '../components/AnswerDiff'
+import SpeakButton from '../components/SpeakButton'
 import { Empty, ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, PARTS_OF_SPEECH } from '../constants'
+import { normalizeAnswer } from '../utils/textDiff'
 
 export default function Review({ type }) {
   const isSentence = type === 'sentences'
@@ -26,7 +29,7 @@ export default function Review({ type }) {
   }
   const current = items[index]
   const expected = current ? (isSentence ? current.target_text : current.word) : ''
-  const matches = answer.trim() === expected.trim()
+  const matches = normalizeAnswer(answer) === normalizeAnswer(expected)
   const submitAnswer = (event) => { event.preventDefault(); if (answer.trim()) setSubmitted(true) }
   const assess = async (mastery) => {
     try {
@@ -55,8 +58,9 @@ export default function Review({ type }) {
           <p className="input-hint">{isSentence ? 'Ctrl + Enter 提交' : 'Enter 提交'} · 提交前不会显示答案</p>
           <button className="button button-primary button-wide" disabled={!answer.trim()}>提交答案 <span>→</span></button>
         </form> : <div className="answer-result">
-          <div className="comparison"><div><span>你的答案</span><p className={!matches ? 'answer-wrong' : ''}>{answer}</p></div><div><span>标准答案</span><p className="answer-correct" lang={current.language}>{expected}</p></div></div>
-          <div className={`match-result ${matches ? 'match' : 'mismatch'}`}>{matches ? '✓ 完全一致' : '请对照标准答案检查'}</div>
+          <AnswerDiff actual={answer} expected={expected} />
+          <div className={`match-result ${matches ? 'match' : 'mismatch'}`}>{matches ? '✓ 完全一致' : '请对照高亮部分检查差异'}</div>
+          <div className="answer-tools"><SpeakButton text={expected} language={current.language} label={isSentence ? '朗读标准答案' : '朗读单词'} /></div>
           {current.notes && <div className="context-box notes-context"><span>注释 / 讲解</span><p>{current.notes}</p></div>}
           {!isSentence && current.sentences?.length > 0 && <div className="context-box"><span>来源句</span>{current.sentences.map((sentence) => <div key={sentence.id}><p lang={sentence.language}>{sentence.target_text}</p><small>{sentence.chinese_text}</small>{sentence.notes && <small className="source-notes">讲解：{sentence.notes}</small>}</div>)}</div>}
           {isSentence && current.words?.length > 0 && <div className="context-box"><span>这句话中的单词</span><div className="tag-list">{current.words.map((word) => <span className="tag" key={word.id}>{word.word} · {word.meaning}</span>)}</div></div>}

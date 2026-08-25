@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -12,7 +14,7 @@ router = APIRouter(prefix="/words", tags=["words"])
 
 
 def word_query():
-    return select(Word).options(
+    return select(Word).where(Word.deleted_at.is_(None)).options(
         selectinload(Word.tags),
         selectinload(Word.sentences),
     )
@@ -43,11 +45,19 @@ async def list_words(
 
 @router.post("", response_model=WordOut, status_code=status.HTTP_201_CREATED)
 async def create_word(payload: WordCreate, db: Session = Depends(get_db)):
-    language_words = db.scalars(word_query().where(Word.language == payload.language)).unique().all()
+    language_words = db.scalars(
+        select(Word).options(selectinload(Word.sentences)).where(Word.language == payload.language)
+    ).unique().all()
     normalized = payload.word.strip().casefold()
-    existing = next((item for item in language_words if item.word.strip().casefold() == normalized), None)
+    matches = [item for item in language_words if item.word.strip().casefold() == normalized]
+    existing = next((item for item in matches if item.deleted_at is None), None)
+    if existing is None and matches:
+        raise HTTPException(status_code=409, detail="这个单词在回收站中，请先恢复后再添加")
     if existing is not None:
-        sources = list(db.scalars(select(Sentence).where(Sentence.id.in_(payload.source_sentence_ids))).all()) if payload.source_sentence_ids else []
+        sources = list(db.scalars(select(Sentence).where(
+            Sentence.id.in_(payload.source_sentence_ids),
+            Sentence.deleted_at.is_(None),
+        )).all()) if payload.source_sentence_ids else []
         for sentence in sources:
             if sentence not in existing.sentences:
                 existing.sentences.append(sentence)
@@ -57,7 +67,10 @@ async def create_word(payload: WordCreate, db: Session = Depends(get_db)):
     values = payload.model_dump(exclude={"tags", "source_sentence_ids"})
     word = Word(**values, tags=tags_for_names(db, payload.tags))
     if payload.source_sentence_ids:
-        word.sentences = list(db.scalars(select(Sentence).where(Sentence.id.in_(payload.source_sentence_ids))).all())
+        word.sentences = list(db.scalars(select(Sentence).where(
+            Sentence.id.in_(payload.source_sentence_ids),
+            Sentence.deleted_at.is_(None),
+        )).all())
     db.add(word)
     db.commit()
     return db.scalar(word_query().where(Word.id == word.id))
@@ -73,22 +86,25 @@ async def get_word(word_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{word_id}", response_model=WordOut)
 async def update_word(word_id: int, payload: WordUpdate, db: Session = Depends(get_db)):
-    word = db.get(Word, word_id)
+    word = db.scalar(select(Word).where(Word.id == word_id, Word.deleted_at.is_(None)))
     if word is None:
         raise HTTPException(status_code=404, detail="单词不存在")
     for key, value in payload.model_dump(exclude={"tags", "source_sentence_ids"}).items():
         setattr(word, key, value)
     word.tags = tags_for_names(db, payload.tags)
-    word.sentences = list(db.scalars(select(Sentence).where(Sentence.id.in_(payload.source_sentence_ids))).all()) if payload.source_sentence_ids else []
+    word.sentences = list(db.scalars(select(Sentence).where(
+        Sentence.id.in_(payload.source_sentence_ids),
+        Sentence.deleted_at.is_(None),
+    )).all()) if payload.source_sentence_ids else []
     db.commit()
     return db.scalar(word_query().where(Word.id == word.id))
 
 
 @router.delete("/{word_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_word(word_id: int, db: Session = Depends(get_db)):
-    word = db.get(Word, word_id)
+    word = db.scalar(select(Word).where(Word.id == word_id, Word.deleted_at.is_(None)))
     if word is None:
         raise HTTPException(status_code=404, detail="单词不存在")
-    db.delete(word)
+    word.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

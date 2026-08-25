@@ -45,6 +45,7 @@ class Sentence(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     tags: Mapped[list["Tag"]] = relationship(secondary=sentence_tags, back_populates="sentences")
     words: Mapped[list["Word"]] = relationship(secondary=sentence_words, back_populates="sentences")
@@ -64,6 +65,7 @@ class Word(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     tags: Mapped[list["Tag"]] = relationship(secondary=word_tags, back_populates="words")
     sentences: Mapped[list[Sentence]] = relationship(secondary=sentence_words, back_populates="words")

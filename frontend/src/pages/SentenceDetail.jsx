@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
+import SpeakButton from '../components/SpeakButton'
 import TagInput from '../components/TagInput'
 import { ErrorMessage, Loading } from '../components/Status'
 import { formatDate, LANGUAGES, MASTERY, PARTS_OF_SPEECH } from '../constants'
@@ -45,8 +46,8 @@ export default function SentenceDetail() {
     } catch (err) { setError(err.message) } finally { setSaving(false) }
   }
   const remove = async () => {
-    if (!window.confirm('确定删除这句话吗？关联单词不会被删除。')) return
-    await api.delete(`/sentences/${id}`); navigate('/sentences')
+    if (!window.confirm('确定把这句话移至回收站吗？关联单词不会被删除。')) return
+    await api.delete(`/sentences/${id}`); navigate('/sentences', { state: { notice: '句子已移至回收站。' } })
   }
   if (!item && !error) return <Loading />
   if (!item) return <ErrorMessage message={error} />
@@ -57,11 +58,11 @@ export default function SentenceDetail() {
       <article className="detail-card">
         <div className="detail-kicker"><span className="language-badge">{LANGUAGES[item.language].short}</span><span>{LANGUAGES[item.language].label}</span><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span></div>
         <p className="detail-chinese">{item.chinese_text}</p>
-        <h1 lang={item.language}>{item.target_text}</h1>
+        <div className="speak-line"><h1 lang={item.language}>{item.target_text}</h1><SpeakButton text={item.target_text} language={item.language} label="朗读句子" /></div>
         {item.notes && <div className="notes-panel"><span>注释 / 讲解</span><p>{item.notes}</p></div>}
         <div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div>
         <div className="detail-stats"><div><span>复习次数</span><strong>{item.review_count}</strong></div><div><span>最近复习</span><strong>{formatDate(item.last_reviewed_at)}</strong></div><div><span>收录时间</span><strong>{formatDate(item.created_at)}</strong></div></div>
-        <div className="detail-actions"><Link className="button button-quiet" to={`/sentences/${id}/edit`}>编辑句子</Link><button className="button button-danger-quiet" onClick={remove}>删除</button></div>
+        <div className="detail-actions"><Link className="button button-quiet" to={`/sentences/${id}/edit`}>编辑句子</Link><button className="button button-danger-quiet" onClick={remove}>移至回收站</button></div>
       </article>
 
       <section className="linked-section">

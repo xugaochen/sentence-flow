@@ -9,6 +9,7 @@ import SentenceLibrary from './pages/SentenceLibrary'
 import SentenceDetail from './pages/SentenceDetail'
 import WordLibrary from './pages/WordLibrary'
 import WordDetail from './pages/WordDetail'
+import DataManagement from './pages/DataManagement'
 import Review from './pages/Review'
 import './styles.css'
 
@@ -24,6 +25,7 @@ const router = createBrowserRouter([
       { path: '/sentences/:id/edit', element: <SentenceForm /> },
       { path: '/words', element: <WordLibrary /> },
       { path: '/words/:id', element: <WordDetail /> },
+      { path: '/data', element: <DataManagement /> },
       { path: '/review/sentences', element: <Review type="sentences" /> },
       { path: '/review/words', element: <Review type="words" /> },
     ],

@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api, queryString } from '../api'
 import { Empty, ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, MASTERY } from '../constants'
 
 export default function SentenceLibrary() {
+  const location = useLocation()
   const [filters, setFilters] = useState({ q: '', language: '', mastery: '', tag: '' })
   const [items, setItems] = useState([])
   const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState(location.state?.notice || '')
 
   const load = () => {
     setLoading(true)
@@ -20,8 +22,8 @@ export default function SentenceLibrary() {
 
   const remove = async (event, item) => {
     event.preventDefault(); event.stopPropagation()
-    if (!window.confirm(`确定删除这句话吗？\n${item.target_text}`)) return
-    await api.delete(`/sentences/${item.id}`); load()
+    if (!window.confirm(`确定把这句话移至回收站吗？\n${item.target_text}`)) return
+    await api.delete(`/sentences/${item.id}`); setError(''); setNotice('句子已移至回收站。'); load()
   }
 
   return (
@@ -34,12 +36,13 @@ export default function SentenceLibrary() {
         <select aria-label="熟练度筛选" value={filters.mastery} onChange={(e) => setFilters({ ...filters, mastery: e.target.value })}><option value="">全部熟练度</option>{Object.entries(MASTERY).map(([v, x]) => <option key={v} value={v}>{x.label}</option>)}</select>
       </div>
       <ErrorMessage message={error} />
+      {notice && <div className="success-banner">{notice} <Link to="/data">前往回收站</Link></div>}
       {loading ? <Loading /> : items.length === 0 ? <Empty title="还没有找到句子">换一个筛选条件，或添加第一句想说的话。</Empty> : (
         <div className="sentence-list">
           {items.map((item, index) => <Link className="sentence-row" to={`/sentences/${item.id}`} key={item.id}>
             <span className="row-index">{String(index + 1).padStart(2, '0')}</span>
             <div className="sentence-copy"><p>{item.chinese_text}</p><h3 lang={item.language}>{item.target_text}</h3><div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div></div>
-            <div className="row-meta"><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span><small>{LANGUAGES[item.language].label} · 复习 {item.review_count} 次</small><button className="text-danger" onClick={(event) => remove(event, item)}>删除</button></div>
+            <div className="row-meta"><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span><small>{LANGUAGES[item.language].label} · 复习 {item.review_count} 次</small><button className="text-danger" onClick={(event) => remove(event, item)}>移至回收站</button></div>
             <span className="row-arrow">→</span>
           </Link>)}
         </div>
@@ -47,4 +50,3 @@ export default function SentenceLibrary() {
     </div>
   )
 }
-

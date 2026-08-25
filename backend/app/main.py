@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
 from .migrations import ensure_schema
-from .routers import meta, reviews, sentences, words
+from .routers import data, meta, reviews, sentences, words
 
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ app.include_router(sentences.router, prefix="/api")
 app.include_router(words.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(meta.router, prefix="/api")
+app.include_router(data.router, prefix="/api")
 
 
 @app.get("/api/health")

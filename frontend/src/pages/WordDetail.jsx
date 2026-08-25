@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
+import SpeakButton from '../components/SpeakButton'
 import TagInput from '../components/TagInput'
 import { ErrorMessage, Loading } from '../components/Status'
 import { formatDate, LANGUAGES, MASTERY, PARTS_OF_SPEECH } from '../constants'
@@ -25,8 +26,8 @@ export default function WordDetail() {
     } catch (err) { setError(err.message) }
   }
   const remove = async () => {
-    if (!window.confirm(`确定删除单词“${item.word}”吗？来源句不会被删除。`)) return
-    await api.delete(`/words/${id}`); navigate('/words')
+    if (!window.confirm(`确定把单词“${item.word}”移至回收站吗？来源句不会被删除。`)) return
+    await api.delete(`/words/${id}`); navigate('/words', { state: { notice: '单词已移至回收站。' } })
   }
   if (!item && !error) return <Loading />
   if (!item) return <ErrorMessage message={error} />
@@ -39,11 +40,11 @@ export default function WordDetail() {
     <article className="detail-card">
       {!editing ? <>
         <div className="detail-kicker"><span className="language-badge">{LANGUAGES[item.language].short}</span><span>{LANGUAGES[item.language].label} · {item.part_of_speech}</span><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span></div>
-        <h1 lang={item.language}>{item.word}</h1><p className="word-meaning">{item.meaning}</p>
+        <div className="speak-line"><h1 lang={item.language}>{item.word}</h1><SpeakButton text={item.word} language={item.language} label="朗读单词" /></div><p className="word-meaning">{item.meaning}</p>
         {item.notes && <div className="notes-panel"><span>注释 / 讲解</span><p>{item.notes}</p></div>}
         <div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div>
         <div className="detail-stats"><div><span>复习次数</span><strong>{item.review_count}</strong></div><div><span>最近复习</span><strong>{formatDate(item.last_reviewed_at)}</strong></div><div><span>收录时间</span><strong>{formatDate(item.created_at)}</strong></div></div>
-        <div className="detail-actions"><button className="button button-quiet" onClick={() => setEditing(true)}>编辑单词</button><button className="button button-danger-quiet" onClick={remove}>删除</button></div>
+        <div className="detail-actions"><button className="button button-quiet" onClick={() => setEditing(true)}>编辑单词</button><button className="button button-danger-quiet" onClick={remove}>移至回收站</button></div>
       </> : <form onSubmit={save}>
         <div className="section-heading"><h2>编辑单词</h2><button className="icon-button" type="button" onClick={() => { setEditing(false); load() }}>×</button></div>
         <ErrorMessage message={error} />

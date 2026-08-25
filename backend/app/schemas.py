@@ -82,6 +82,11 @@ class SentenceOut(BaseModel):
     tags: list[TagOut]
     words: list[WordBrief] = Field(default_factory=list)
 
+    @field_validator("words", mode="before")
+    @classmethod
+    def active_words(cls, values):
+        return [value for value in values if getattr(value, "deleted_at", None) is None]
+
 
 class WordBase(BaseModel):
     word: str = Field(min_length=1)
@@ -98,7 +103,7 @@ class WordBase(BaseModel):
 
     @field_validator("notes")
     @classmethod
-    def strip_notes(cls, value: str) -> str:
+    def strip_optional_text(cls, value: str) -> str:
         return value.strip()
 
     @field_validator("tags")
@@ -132,6 +137,34 @@ class WordOut(BaseModel):
     review_count: int
     tags: list[TagOut]
     sentences: list[SentenceBrief] = Field(default_factory=list)
+
+    @field_validator("sentences", mode="before")
+    @classmethod
+    def active_sentences(cls, values):
+        return [value for value in values if getattr(value, "deleted_at", None) is None]
+
+
+class TrashSentenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    chinese_text: str
+    target_text: str
+    language: str
+    deleted_at: datetime
+
+
+class TrashWordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    word: str
+    meaning: str
+    language: str
+    deleted_at: datetime
+
+
+class TrashOut(BaseModel):
+    sentences: list[TrashSentenceOut] = Field(default_factory=list)
+    words: list[TrashWordOut] = Field(default_factory=list)
 
 
 class ReviewResult(BaseModel):

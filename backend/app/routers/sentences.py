@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -12,7 +14,7 @@ router = APIRouter(prefix="/sentences", tags=["sentences"])
 
 
 def sentence_query():
-    return select(Sentence).options(
+    return select(Sentence).where(Sentence.deleted_at.is_(None)).options(
         selectinload(Sentence.tags),
         selectinload(Sentence.words),
     )
@@ -57,7 +59,7 @@ async def get_sentence(sentence_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{sentence_id}", response_model=SentenceOut)
 async def update_sentence(sentence_id: int, payload: SentenceUpdate, db: Session = Depends(get_db)):
-    sentence = db.get(Sentence, sentence_id)
+    sentence = db.scalar(select(Sentence).where(Sentence.id == sentence_id, Sentence.deleted_at.is_(None)))
     if sentence is None:
         raise HTTPException(status_code=404, detail="句子不存在")
     for key, value in payload.model_dump(exclude={"tags"}).items():
@@ -69,17 +71,22 @@ async def update_sentence(sentence_id: int, payload: SentenceUpdate, db: Session
 
 @router.delete("/{sentence_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_sentence(sentence_id: int, db: Session = Depends(get_db)):
-    sentence = db.get(Sentence, sentence_id)
+    sentence = db.scalar(select(Sentence).where(Sentence.id == sentence_id, Sentence.deleted_at.is_(None)))
     if sentence is None:
         raise HTTPException(status_code=404, detail="句子不存在")
-    db.delete(sentence)
+    sentence.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{sentence_id}/words", response_model=WordOut, status_code=status.HTTP_201_CREATED)
 async def add_word_to_sentence(sentence_id: int, payload: WordCreate, db: Session = Depends(get_db)):
-    sentence = db.scalar(select(Sentence).options(selectinload(Sentence.words)).where(Sentence.id == sentence_id))
+    sentence = db.scalar(
+        select(Sentence).options(selectinload(Sentence.words)).where(
+            Sentence.id == sentence_id,
+            Sentence.deleted_at.is_(None),
+        )
+    )
     if sentence is None:
         raise HTTPException(status_code=404, detail="句子不存在")
     if payload.language != sentence.language:
@@ -89,7 +96,10 @@ async def add_word_to_sentence(sentence_id: int, payload: WordCreate, db: Sessio
         select(Word).options(selectinload(Word.sentences)).where(Word.language == payload.language)
     ).unique().all()
     normalized = payload.word.strip().casefold()
-    word = next((item for item in language_words if item.word.strip().casefold() == normalized), None)
+    matches = [item for item in language_words if item.word.strip().casefold() == normalized]
+    word = next((item for item in matches if item.deleted_at is None), None)
+    if word is None and matches:
+        raise HTTPException(status_code=409, detail="这个单词在回收站中，请先恢复后再关联")
     if word is None:
         values = payload.model_dump(exclude={"tags", "source_sentence_ids"})
         word = Word(**values, tags=tags_for_names(db, payload.tags))
@@ -104,8 +114,18 @@ async def add_word_to_sentence(sentence_id: int, payload: WordCreate, db: Sessio
 
 @router.post("/{sentence_id}/words/{word_id}", response_model=WordOut)
 async def link_existing_word(sentence_id: int, word_id: int, db: Session = Depends(get_db)):
-    sentence = db.scalar(select(Sentence).options(selectinload(Sentence.words)).where(Sentence.id == sentence_id))
-    word = db.scalar(select(Word).options(selectinload(Word.sentences)).where(Word.id == word_id))
+    sentence = db.scalar(
+        select(Sentence).options(selectinload(Sentence.words)).where(
+            Sentence.id == sentence_id,
+            Sentence.deleted_at.is_(None),
+        )
+    )
+    word = db.scalar(
+        select(Word).options(selectinload(Word.sentences)).where(
+            Word.id == word_id,
+            Word.deleted_at.is_(None),
+        )
+    )
     if sentence is None:
         raise HTTPException(status_code=404, detail="句子不存在")
     if word is None:

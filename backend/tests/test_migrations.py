@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, inspect
 from app.migrations import ensure_schema
 
 
-def test_notes_migration_preserves_existing_rows(tmp_path: Path):
+def test_additive_migration_preserves_existing_rows(tmp_path: Path):
     database = tmp_path / "old.db"
     connection = sqlite3.connect(database)
     connection.executescript(
@@ -24,10 +24,13 @@ def test_notes_migration_preserves_existing_rows(tmp_path: Path):
     ensure_schema(engine)
 
     inspector = inspect(engine)
-    assert "notes" in {column["name"] for column in inspector.get_columns("sentences")}
-    assert "notes" in {column["name"] for column in inspector.get_columns("words")}
+    sentence_columns = {column["name"] for column in inspector.get_columns("sentences")}
+    word_columns = {column["name"] for column in inspector.get_columns("words")}
+    assert {"notes", "deleted_at"}.issubset(sentence_columns)
+    assert {"notes", "deleted_at"}.issubset(word_columns)
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT chinese_text, notes FROM sentences").one() == ("原有句子", "")
-        assert connection.exec_driver_sql("SELECT word, notes FROM words").one() == ("原有单词", "")
+        assert connection.exec_driver_sql("SELECT chinese_text, notes, deleted_at FROM sentences").one() == ("原有句子", "", None)
+        assert connection.exec_driver_sql("SELECT word, notes, deleted_at FROM words").one() == ("原有单词", "", None)
+        indexes = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list('words')")}
+        assert "ix_words_deleted_at" in indexes
     engine.dispose()
-
