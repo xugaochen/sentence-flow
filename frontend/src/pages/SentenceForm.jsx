@@ -5,6 +5,12 @@ import TagInput from '../components/TagInput'
 import { ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, MASTERY } from '../constants'
 
+const SENTENCE_PLACEHOLDERS = {
+  ja: '別れてから、彼女は前より明るくなった。',
+  es: 'Escribe aquí la frase completa.',
+  en: 'Write the complete sentence here.',
+}
+
 export default function SentenceForm() {
   const { id } = useParams()
   const editing = Boolean(id)
@@ -38,7 +44,7 @@ export default function SentenceForm() {
       <form className="paper-form" onSubmit={submit}>
         <ErrorMessage message={error} />
         <label><span>中文意思 <b>*</b></span><textarea rows="3" autoFocus required placeholder="例如：分手以后，她比以前开朗了。" value={form.chinese_text} onChange={(e) => setForm({ ...form, chinese_text: e.target.value })} /></label>
-        <label><span>目标语言句子 <b>*</b></span><textarea rows="4" required lang={form.language} placeholder={form.language === 'ja' ? '別れてから、彼女は前より明るくなった。' : 'Escribe aquí la frase completa.'} value={form.target_text} onChange={(e) => setForm({ ...form, target_text: e.target.value })} /></label>
+        <label><span>目标语言句子 <b>*</b></span><textarea rows="4" required lang={form.language} placeholder={SENTENCE_PLACEHOLDERS[form.language]} value={form.target_text} onChange={(e) => setForm({ ...form, target_text: e.target.value })} /></label>
         <label><span>注释 / 讲解 <small>可选</small></span><textarea rows="4" placeholder="记录语法、使用场景、容易混淆的地方或自己的理解。" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
         <div className="form-row">
           <fieldset><legend>语言</legend><div className="segmented">{Object.entries(LANGUAGES).map(([value, item]) => <button className={form.language === value ? 'active' : ''} type="button" key={value} onClick={() => setForm({ ...form, language: value })}>{item.label}</button>)}</div></fieldset>

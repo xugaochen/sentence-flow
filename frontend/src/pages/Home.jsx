@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 
 export default function Home() {
-  const [stats, setStats] = useState({ sentence_total: 0, sentence_ja: 0, sentence_es: 0, word_total: 0, reviewed_today: 0 })
+  const [stats, setStats] = useState({ sentence_total: 0, sentence_ja: 0, sentence_es: 0, sentence_en: 0, word_total: 0, reviewed_today: 0 })
   useEffect(() => { api.get('/stats').then(setStats).catch(() => {}) }, [])
 
   return (
@@ -11,7 +11,7 @@ export default function Home() {
       <section className="hero">
         <p className="eyebrow">ACTIVE RECALL · 主动输出</p>
         <h1>把想说的话，<br /><em>练成自己的语言。</em></h1>
-        <p className="hero-copy">从中文出发，完整写出日语或西班牙语。句子是核心，单词始终留在语境里。</p>
+        <p className="hero-copy">以主动输出为核心，反复练习真正想表达的句子。单词始终留在语境里。</p>
         <div className="hero-actions">
           <Link className="button button-primary" to="/review/sentences">开始句子复习 <span>→</span></Link>
           <Link className="button button-quiet" to="/sentences/new">添加新句子</Link>
@@ -20,7 +20,7 @@ export default function Home() {
 
       <section className="stats-grid" aria-label="学习统计">
         <div className="stat stat-featured"><span>今日已复习</span><strong>{stats.reviewed_today}</strong><small>次主动回忆</small></div>
-        <div className="stat"><span>句子总数</span><strong>{stats.sentence_total}</strong><small>{stats.sentence_ja} 日语 · {stats.sentence_es} 西语</small></div>
+        <div className="stat"><span>句子总数</span><strong>{stats.sentence_total}</strong><small>{stats.sentence_ja} 日语 · {stats.sentence_es} 西语 · {stats.sentence_en} 英语</small></div>
         <div className="stat"><span>单词总数</span><strong>{stats.word_total}</strong><small>全部保留来源语境</small></div>
       </section>
 
@@ -35,4 +35,3 @@ export default function Home() {
     </div>
   )
 }
-

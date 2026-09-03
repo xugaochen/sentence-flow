@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-Language = Literal["ja", "es"]
+Language = Literal["ja", "es", "en"]
 Mastery = Literal["unknown", "fuzzy", "known"]
 
 
@@ -175,5 +175,6 @@ class StatsOut(BaseModel):
     sentence_total: int
     sentence_ja: int
     sentence_es: int
+    sentence_en: int
     word_total: int
     reviewed_today: int

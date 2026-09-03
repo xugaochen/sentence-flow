@@ -21,6 +21,7 @@ async def stats(db: Session = Depends(get_db)):
         sentence_total=db.scalar(select(func.count(Sentence.id)).where(Sentence.deleted_at.is_(None))) or 0,
         sentence_ja=db.scalar(select(func.count(Sentence.id)).where(Sentence.language == "ja", Sentence.deleted_at.is_(None))) or 0,
         sentence_es=db.scalar(select(func.count(Sentence.id)).where(Sentence.language == "es", Sentence.deleted_at.is_(None))) or 0,
+        sentence_en=db.scalar(select(func.count(Sentence.id)).where(Sentence.language == "en", Sentence.deleted_at.is_(None))) or 0,
         word_total=db.scalar(select(func.count(Word.id)).where(Word.deleted_at.is_(None))) or 0,
         reviewed_today=db.scalar(
             select(func.count(ReviewLog.id)).where(

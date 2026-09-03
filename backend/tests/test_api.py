@@ -99,12 +99,33 @@ async def request_flow():
         assert reviewed["mastery"] == "known"
         assert reviewed["review_count"] == 1
 
+        english_response = await client.post("/api/sentences", json={
+            "chinese_text": "我每天学习英语。",
+            "target_text": "I study English every day.",
+            "language": "en",
+            "notes": "一般现在时。",
+            "tags": ["日常"],
+        })
+        assert english_response.status_code == 201
+        english_sentence = english_response.json()
+        english_word_response = await client.post(f"/api/sentences/{english_sentence['id']}/words", json={
+            "word": "study",
+            "meaning": "学习",
+            "language": "en",
+            "notes": "",
+            "part_of_speech": "动词",
+            "tags": ["常用"],
+        })
+        assert english_word_response.status_code == 201
+        assert [item["id"] for item in (await client.get("/api/reviews/sentences?language=en&limit=10")).json()] == [english_sentence["id"]]
+
         stats = (await client.get("/api/stats")).json()
         assert stats == {
-            "sentence_total": 2,
+            "sentence_total": 3,
             "sentence_ja": 2,
             "sentence_es": 0,
-            "word_total": 2,
+            "sentence_en": 1,
+            "word_total": 3,
             "reviewed_today": 1,
         }
 

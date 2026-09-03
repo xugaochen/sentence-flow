@@ -1,6 +1,7 @@
 export const LANGUAGES = {
   ja: { label: '日语', short: '日' },
   es: { label: '西班牙语', short: '西' },
+  en: { label: '英语', short: '英' },
 }
 
 export const MASTERY = {
@@ -17,4 +18,3 @@ export function formatDate(value) {
   if (!value) return '尚未复习'
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value))
 }
-
