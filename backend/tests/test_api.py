@@ -126,6 +126,9 @@ async def request_flow():
             "sentence_es": 0,
             "sentence_en": 1,
             "word_total": 3,
+            "word_ja": 2,
+            "word_es": 0,
+            "word_en": 1,
             "reviewed_today": 1,
         }
 

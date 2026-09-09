@@ -177,4 +177,7 @@ class StatsOut(BaseModel):
     sentence_es: int
     sentence_en: int
     word_total: int
+    word_ja: int
+    word_es: int
+    word_en: int
     reviewed_today: int

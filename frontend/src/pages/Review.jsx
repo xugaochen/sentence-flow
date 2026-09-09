@@ -15,7 +15,7 @@ export default function Review({ type }) {
   const [tags, setTags] = useState([]); const [items, setItems] = useState([]); const [index, setIndex] = useState(0)
   const [answer, setAnswer] = useState(''); const [submitted, setSubmitted] = useState(false); const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [results, setResults] = useState({ unknown: 0, fuzzy: 0, known: 0 }); const inputRef = useRef(null)
+  const [results, setResults] = useState({ unknown: 0, fuzzy: 0, known: 0, skipped: 0 }); const inputRef = useRef(null)
 
   useEffect(() => { api.get(`/tags?kind=${isSentence ? 'sentence' : 'word'}`).then(setTags).catch(() => {}) }, [isSentence])
   useEffect(() => { setPhase('setup'); setItems([]); setIndex(0); setAnswer(''); setSubmitted(false); setError(''); setNotice('') }, [type])
@@ -25,7 +25,7 @@ export default function Review({ type }) {
     if (!isSentence) params.part_of_speech = settings.part_of_speech
     try {
       const data = await api.get(`/reviews/${type}${queryString(params)}`)
-      setItems(data); setIndex(0); setResults({ unknown: 0, fuzzy: 0, known: 0 }); setPhase(data.length ? 'review' : 'empty')
+      setItems(data); setIndex(0); setResults({ unknown: 0, fuzzy: 0, known: 0, skipped: 0 }); setPhase(data.length ? 'review' : 'empty')
       setTimeout(() => inputRef.current?.focus(), 0)
     } catch (err) { setError(err.message); setPhase('setup') }
   }
@@ -34,6 +34,18 @@ export default function Review({ type }) {
   const matches = normalizeAnswer(answer) === normalizeAnswer(expected)
   const submitAnswer = (event) => { event.preventDefault(); if (answer.trim()) { setNotice(''); setSubmitted(true) } }
   const updateCurrent = (updated) => setItems((previous) => previous.map((item) => item.id === updated.id ? updated : item))
+  const advance = (nextNotice = '') => {
+    if (index + 1 >= items.length) {
+      setNotice(''); setPhase('done')
+    } else {
+      setIndex(index + 1); setAnswer(''); setSubmitted(false); setError(''); setNotice(nextNotice)
+      setTimeout(() => inputRef.current?.focus(), 0)
+    }
+  }
+  const skip = () => {
+    setResults((previous) => ({ ...previous, skipped: previous.skipped + 1 }))
+    advance('上一题已跳过，没有记录复习结果。')
+  }
   const removeCurrent = (sentenceId) => {
     const remaining = items.filter((item) => item.id !== sentenceId)
     setItems(remaining); setAnswer(''); setSubmitted(false); setError('')
@@ -47,9 +59,8 @@ export default function Review({ type }) {
     try {
       await api.post(`/reviews/${type}/${current.id}`, { mastery })
       setNotice('')
-      setResults({ ...results, [mastery]: results[mastery] + 1 })
-      if (index + 1 >= items.length) setPhase('done')
-      else { setIndex(index + 1); setAnswer(''); setSubmitted(false); setTimeout(() => inputRef.current?.focus(), 0) }
+      setResults((previous) => ({ ...previous, [mastery]: previous[mastery] + 1 }))
+      advance()
     } catch (err) { setError(err.message) }
   }
 
@@ -71,6 +82,7 @@ export default function Review({ type }) {
           {isSentence ? <textarea id="answer" ref={inputRef} rows="4" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="在这里写下你的答案…" onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitAnswer(e) }} /> : <input id="answer" ref={inputRef} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="在这里写下你的答案…" />}
           <p className="input-hint">{isSentence ? 'Ctrl + Enter 提交' : 'Enter 提交'} · 提交前不会显示答案</p>
           <button className="button button-primary button-wide" disabled={!answer.trim()}>提交答案 <span>→</span></button>
+          <button type="button" className="review-skip-button" onClick={skip}>暂时跳过此题 <span>→</span></button>
         </form> : <div className="answer-result">
           <AnswerDiff actual={answer} expected={expected} />
           <div className={`match-result ${matches ? 'match' : 'mismatch'}`}>{matches ? '✓ 完全一致' : '请对照高亮部分检查差异'}</div>
@@ -103,5 +115,6 @@ function Setup({ isSentence, settings, setSettings, tags, start, error }) {
 }
 
 function Done({ isSentence, total, results, restart }) {
-  return <div className="review-page done-page"><div className="done-mark">✓</div><p className="eyebrow">SESSION COMPLETE</p><h1>本轮完成</h1><p>你刚刚完成了 {total} 次主动回忆。</p><div className="result-stats"><div><strong>{results.unknown}</strong><span>不会</span></div><div><strong>{results.fuzzy}</strong><span>模糊</span></div><div><strong>{results.known}</strong><span>会了</span></div></div><div className="hero-actions"><button className="button button-primary" onClick={restart}>再来一轮</button><Link className="button button-quiet" to={isSentence ? '/sentences' : '/words'}>返回{isSentence ? '句子' : '单词'}库</Link></div></div>
+  const reviewed = total - results.skipped
+  return <div className="review-page done-page"><div className="done-mark">✓</div><p className="eyebrow">SESSION COMPLETE</p><h1>本轮完成</h1><p>完成了 {reviewed} 次主动回忆{results.skipped ? `，跳过 ${results.skipped} 题` : ''}。</p><div className="result-stats"><div><strong>{results.unknown}</strong><span>不会</span></div><div><strong>{results.fuzzy}</strong><span>模糊</span></div><div><strong>{results.known}</strong><span>会了</span></div><div><strong>{results.skipped}</strong><span>跳过</span></div></div><div className="hero-actions"><button className="button button-primary" onClick={restart}>再来一轮</button><Link className="button button-quiet" to={isSentence ? '/sentences' : '/words'}>返回{isSentence ? '句子' : '单词'}库</Link></div></div>
 }
