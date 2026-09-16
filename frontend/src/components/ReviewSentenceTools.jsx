@@ -17,6 +17,7 @@ export default function ReviewSentenceTools({ sentence, onUpdate, onDelete }) {
   const [word, setWord] = useState(emptyWord)
   const [existingWords, setExistingWords] = useState([])
   const [saving, setSaving] = useState(false)
+  const [confirmingTrash, setConfirmingTrash] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -31,6 +32,7 @@ export default function ReviewSentenceTools({ sentence, onUpdate, onDelete }) {
     setWord(emptyWord())
     setExistingWords([])
     setSaving(false)
+    setConfirmingTrash(false)
     setError('')
     setNotice('')
   }, [sentence.id])
@@ -109,21 +111,21 @@ export default function ReviewSentenceTools({ sentence, onUpdate, onDelete }) {
     } catch (err) { setError(err.message) } finally { setSaving(false) }
   }
 
-  const moveToTrash = async () => {
-    if (!window.confirm(`确定把这句话移至回收站吗？\n${sentence.target_text}`)) return
-    setSaving(true); setError(''); setNotice('')
-    try {
-      await api.delete(`/sentences/${sentence.id}`)
-      onDelete(sentence.id)
-    } catch (err) { setError(err.message); setSaving(false) }
+  const moveToTrash = () => {
+    setConfirmingTrash(false); setError(''); setNotice('')
+    onDelete(sentence)
   }
 
   return <section className="review-study-tools">
     <div className="review-study-heading">
       <div>
         <div><span>复习时补充</span><small>修改内容会同步保存到句子库</small></div>
-        <button type="button" className="review-trash-button" disabled={saving} onClick={moveToTrash}>移至回收站</button>
+        {!confirmingTrash && <button type="button" className="review-trash-button" disabled={saving} onClick={() => setConfirmingTrash(true)}>移至回收站</button>}
       </div>
+      {confirmingTrash && <div className="review-trash-confirm" role="alert">
+        <span>确定把这句话移至回收站吗？</span>
+        <div><button type="button" className="button button-small button-quiet" onClick={() => setConfirmingTrash(false)}>取消</button><button type="button" className="button button-small button-danger" onClick={moveToTrash}>确认移至回收站</button></div>
+      </div>}
       <div>
         <button type="button" aria-expanded={editingOriginal} className={`button button-small button-quiet ${editingOriginal ? 'active' : ''}`} onClick={() => { setEditingOriginal(!editingOriginal); setOriginal(sentence.target_text); setError(''); setNotice('') }}>{editingOriginal ? '收起原文' : '修改原文'}</button>
         <button type="button" aria-expanded={editingTranslation} className={`button button-small button-quiet ${editingTranslation ? 'active' : ''}`} onClick={() => { setEditingTranslation(!editingTranslation); setTranslation(sentence.chinese_text); setError(''); setNotice('') }}>{editingTranslation ? '收起翻译' : '修改翻译'}</button>

@@ -8,7 +8,7 @@
 
 - 句子的添加、查看、编辑、移至回收站、搜索及语言 / 标签 / 熟练度筛选
 - 句子主动输入复习；忽略首尾空白并统一 Unicode NFC，提交后用红色和绿色标出字符差异
-- “不会 / 模糊 / 会了”自评及 5 / 3 / 1 加权随机抽题
+- “不会 / 模糊 / 会了”自评，并可选择智能间隔、5 / 3 / 1 加权、均匀有放回或新题优先抽题
 - 从句子详情或句子复习揭晓页手动添加单词，不做自动分词
 - 句子和单词均可记录自己的注释、语法说明与使用提示
 - 句子复习揭晓答案后可直接补充句子注释，并新建或关联词库中的单词
@@ -64,10 +64,23 @@ language_study/
 │  ├─ package.json
 │  └─ vite.config.js
 ├─ seed-example-data.bat
-├─ start-all.bat
-├─ start-backend.bat
-└─ start-frontend.bat
+├─ start-all-linux.sh       # Linux/WSL 低负载启动（默认）
+├─ start-dev-linux.sh       # Linux/WSL 开发模式
+├─ start-backend-linux.sh   # Linux/WSL 独立后端开发服务
+├─ start-all.bat            # Windows 低负载启动（默认）
+├─ start-dev.bat            # Windows 开发模式
+├─ start-backend.bat        # Windows 独立后端开发服务
+└─ start-frontend.bat       # Windows 独立前端开发服务
 ```
+
+## 运行模式
+
+| 模式 | 适合场景 | 运行方式 | 地址 |
+| --- | --- | --- | --- |
+| 低负载模式（默认） | 日常学习 | 启动时快速构建前端，运行期间只保留一个不带热重载的 Python 服务 | `http://localhost:5173` |
+| 开发模式 | 修改和调试代码 | 同时运行 Vite 与 Uvicorn，支持前端热更新和后端自动重载 | 网页 `5173`，API `8000` |
+
+默认模式每次启动都会执行一次前端生产构建。Node.js 只在这段短暂的构建期间工作，构建完成后由 FastAPI 同时提供网页与 `/api`，不会保留 Vite 开发服务器。修改代码后需要重启默认模式才能看到变化。
 
 ## Windows 快速启动
 
@@ -79,19 +92,21 @@ language_study/
 
 ### 一键启动
 
-双击根目录的 `start-all.bat`。第一次运行会自动：
+日常学习时双击根目录的 `start-all.bat`。第一次运行会自动：
 
 1. 在 `backend\.venv` 建立 Python 虚拟环境并安装后端依赖；
 2. 在 `frontend\node_modules` 安装前端依赖；
-3. 打开两个命令窗口，分别运行 API 和网页。
+3. 构建前端，并在当前窗口启动一个低负载服务。
 
-看到两个窗口都显示已启动后，在浏览器访问：
+当前窗口显示服务已启动后，在浏览器访问：
 
 ```text
 http://localhost:5173
 ```
 
-关闭两个命令窗口即可停止应用。
+API 文档位于 `http://127.0.0.1:5173/docs`。在启动窗口按 `Ctrl+C` 或关闭窗口即可停止应用。
+
+开发代码时双击 `start-dev.bat`。它会打开前端和后端两个窗口，网页仍位于 `http://localhost:5173`，API 文档位于 `http://127.0.0.1:8000/docs`；关闭两个窗口即可完全停止开发服务。
 
 ## Linux + Conda 启动
 
@@ -99,19 +114,28 @@ http://localhost:5173
 
 ```bash
 conda create -n language-study python=3.12 pip -y
+conda install -n language-study -c conda-forge nodejs=22 -y
 conda activate language-study
 cd /path/to/language_study
 python -m pip install -r backend/requirements.txt
 ```
 
-环境准备好后，推荐用一键脚本同时启动前端和后端：
+环境准备好后，日常学习推荐使用低负载一键脚本：
 
 ```bash
 cd /path/to/language_study
 ./start-all-linux.sh
 ```
 
-浏览器访问 `http://localhost:5173`。终端按 `Ctrl+C` 会同时停止两个服务。
+脚本会先快速构建前端，然后只运行一个 Python 服务。浏览器访问 `http://localhost:5173`，API 文档位于 `http://127.0.0.1:5173/docs`；终端按 `Ctrl+C` 即可停止。
+
+修改代码时使用开发模式：
+
+```bash
+./start-dev-linux.sh
+```
+
+开发模式会同时运行 Vite 和带热重载的 Uvicorn。网页位于 `http://localhost:5173`，API 文档位于 `http://127.0.0.1:8000/docs`。开发模式占用的内存明显更高，这是文件监听和自动重载所需的正常开销。
 
 如果只想运行后端，可以使用：
 
@@ -135,7 +159,7 @@ npm install
 npm run dev
 ```
 
-## 手动安装和启动
+## 手动启动开发服务
 
 在 PowerShell 或 Windows Terminal 中执行：
 
@@ -155,7 +179,7 @@ npm install
 npm run dev
 ```
 
-然后访问 `http://localhost:5173`。后端 API 文档位于 `http://127.0.0.1:8000/docs`。
+然后访问 `http://localhost:5173`。后端 API 文档位于 `http://127.0.0.1:8000/docs`。这种手动双服务方式等同于开发模式，不是日常学习所需的低负载模式。
 
 ## SQLite 初始化与示例数据
 
@@ -193,7 +217,7 @@ npm run build
 
 - 数据库语言代码为 `ja`、`es` 和 `en`，界面显示“日语”“西班牙语”和“英语”。
 - 熟练度保存为 `unknown`、`fuzzy`、`known`，界面显示“不会”“模糊”“会了”。
-- 每轮抽题不重复；抽取顺序按熟练度使用 5 / 3 / 1 权重。
+- 复习提供四种抽题方式：默认的智能间隔综合熟练度、距上次复习时间和累计次数；加权随机使用 5 / 3 / 1 权重；均匀有放回允许本轮重复但避免连续重复；新题优先会先完成复习次数为 0 的内容。除均匀有放回外，一轮内不重复。
 - 答案比较先使用 `trim` 忽略首尾空白，再统一为 Unicode NFC；标点、内部空格及其他字符仍必须一致。答错时，用户多写或写错的内容显示为红色，标准答案中缺失或不同的内容显示为绿色。
 - 自评后才会更新熟练度、复习次数、最近复习时间和今日复习统计。
 - 单词判重使用“语言 + 去除首尾空格并忽略大小写后的词形”。
@@ -235,11 +259,21 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ### 页面提示“请求失败，请确认后端已启动”
 
-确认后端窗口没有报错，并打开 `http://127.0.0.1:8000/api/health`。正常结果应为 `{"status":"ok"}`。端口 8000 被占用时，需先结束占用程序；如果改后端端口，也要同步修改 `frontend\vite.config.js` 中的代理地址。
+默认低负载模式下，确认启动窗口没有报错，并打开 `http://127.0.0.1:5173/api/health`；开发模式下打开 `http://127.0.0.1:8000/api/health`。正常结果应为 `{"status":"ok"}`。开发模式如果修改后端端口，还需要通过 `LANGUAGE_STUDY_BACKEND_URL` 告诉 Vite 新地址。
 
 ### 端口 5173 已被占用
 
-Vite 通常会提示并自动选择下一个端口，请使用终端中显示的实际地址。若浏览器能打开但 API 不通，优先仍使用 `http://localhost:5173` 或在 `vite.config.js` 固定一个未占用端口。
+先关闭之前启动但尚未退出的句流或其他占用 5173 的程序。Linux/WSL 也可以临时指定其他端口：
+
+```bash
+LANGUAGE_STUDY_FRONTEND_PORT=5174 ./start-all-linux.sh
+```
+
+Windows 可先执行 `set LANGUAGE_STUDY_FRONTEND_PORT=5174`，再运行 `start-all.bat`。低负载模式的网页、API 和 `/docs` 会共同改到新端口。开发模式需要确保前端和后端使用不同端口。
+
+### 修改代码后页面没有变化
+
+低负载模式不会监听源码变化。按 `Ctrl+C` 停止后重新运行默认启动脚本，脚本会重新构建前端；频繁开发时请改用 `start-dev-linux.sh` 或 `start-dev.bat`。
 
 ### 中文或日文显示异常
 

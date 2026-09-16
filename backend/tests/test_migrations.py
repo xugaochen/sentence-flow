@@ -12,9 +12,9 @@ def test_additive_migration_preserves_existing_rows(tmp_path: Path):
     connection.executescript(
         """
         CREATE TABLE sentences (id INTEGER PRIMARY KEY, chinese_text TEXT NOT NULL);
-        CREATE TABLE words (id INTEGER PRIMARY KEY, word TEXT NOT NULL);
+        CREATE TABLE words (id INTEGER PRIMARY KEY, word TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '');
         INSERT INTO sentences (chinese_text) VALUES ('原有句子');
-        INSERT INTO words (word) VALUES ('原有单词');
+        INSERT INTO words (word, notes) VALUES ('hablar', '规则动词。\n直陈式现在时：yo hablo；tú hablas。');
         """
     )
     connection.commit()
@@ -27,10 +27,10 @@ def test_additive_migration_preserves_existing_rows(tmp_path: Path):
     sentence_columns = {column["name"] for column in inspector.get_columns("sentences")}
     word_columns = {column["name"] for column in inspector.get_columns("words")}
     assert {"notes", "deleted_at"}.issubset(sentence_columns)
-    assert {"notes", "deleted_at"}.issubset(word_columns)
+    assert {"notes", "conjugation", "deleted_at"}.issubset(word_columns)
     with engine.connect() as connection:
         assert connection.exec_driver_sql("SELECT chinese_text, notes, deleted_at FROM sentences").one() == ("原有句子", "", None)
-        assert connection.exec_driver_sql("SELECT word, notes, deleted_at FROM words").one() == ("原有单词", "", None)
+        assert connection.exec_driver_sql("SELECT word, notes, conjugation, deleted_at FROM words").one() == ("hablar", "规则动词。", "yo hablo；tú hablas。", None)
         indexes = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list('words')")}
         assert "ix_words_deleted_at" in indexes
     engine.dispose()

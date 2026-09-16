@@ -142,6 +142,7 @@ def export_rows(db: Session) -> dict[str, list[dict]]:
                 "word": item.word,
                 "meaning": item.meaning,
                 "notes": item.notes,
+                "conjugation": item.conjugation,
                 "language": item.language,
                 "part_of_speech": item.part_of_speech,
                 "mastery": item.mastery,
@@ -172,7 +173,7 @@ def export_rows(db: Session) -> dict[str, list[dict]]:
 
 def export_document(db: Session) -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         **export_rows(db),
     }
@@ -192,7 +193,7 @@ async def export_json(db: Session = Depends(get_db)):
 
 CSV_FIELDS = {
     "sentences": ["id", "chinese_text", "target_text", "notes", "language", "mastery", "created_at", "updated_at", "last_reviewed_at", "review_count", "deleted_at"],
-    "words": ["id", "word", "meaning", "notes", "language", "part_of_speech", "mastery", "created_at", "updated_at", "last_reviewed_at", "review_count", "deleted_at"],
+    "words": ["id", "word", "meaning", "notes", "conjugation", "language", "part_of_speech", "mastery", "created_at", "updated_at", "last_reviewed_at", "review_count", "deleted_at"],
     "tags": ["id", "name"],
     "sentence_tags": ["sentence_id", "tag_id"],
     "word_tags": ["word_id", "tag_id"],

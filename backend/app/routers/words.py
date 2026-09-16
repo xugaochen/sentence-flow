@@ -31,7 +31,7 @@ async def list_words(
 ):
     stmt = word_query().order_by(Word.created_at.desc())
     if q:
-        stmt = stmt.where(or_(Word.word.contains(q), Word.meaning.contains(q), Word.notes.contains(q)))
+        stmt = stmt.where(or_(Word.word.contains(q), Word.meaning.contains(q), Word.notes.contains(q), Word.conjugation.contains(q)))
     if language:
         stmt = stmt.where(Word.language == language)
     if mastery:

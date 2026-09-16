@@ -58,6 +58,7 @@ class Word(Base):
     word: Mapped[str] = mapped_column(String(255), index=True)
     meaning: Mapped[str] = mapped_column(String(255), index=True)
     notes: Mapped[str] = mapped_column(Text, default="")
+    conjugation: Mapped[str] = mapped_column(Text, default="")
     language: Mapped[str] = mapped_column(String(12), index=True)
     part_of_speech: Mapped[str] = mapped_column(String(40), default="other", index=True)
     mastery: Mapped[str] = mapped_column(String(12), default="unknown", index=True)

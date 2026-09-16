@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..models import ReviewLog, Sentence, Tag, Word
 from ..schemas import ReviewResult, SentenceOut, WordOut
-from ..services import weighted_sample
+from ..services import sample_review_items
 
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
@@ -17,7 +18,9 @@ router = APIRouter(prefix="/reviews", tags=["reviews"])
 async def sentence_session(
     language: str | None = None,
     tag: str | None = None,
-    limit: int | None = Query(10, ge=1, le=1000),
+    limit: int = Query(10, ge=1, le=1000),
+    mode: Literal["smart", "weighted", "uniform", "new_first"] = "weighted",
+    all_items: bool = False,
     db: Session = Depends(get_db),
 ):
     stmt = select(Sentence).where(Sentence.deleted_at.is_(None)).options(selectinload(Sentence.tags), selectinload(Sentence.words))
@@ -25,7 +28,7 @@ async def sentence_session(
         stmt = stmt.where(Sentence.language == language)
     if tag:
         stmt = stmt.join(Sentence.tags).where(Tag.name == tag)
-    return weighted_sample(db.scalars(stmt).unique().all(), limit)
+    return sample_review_items(db.scalars(stmt).unique().all(), limit, mode, all_items=all_items)
 
 
 @router.post("/sentences/{sentence_id}", response_model=SentenceOut)
@@ -52,7 +55,9 @@ async def word_session(
     language: str | None = None,
     part_of_speech: str | None = None,
     tag: str | None = None,
-    limit: int | None = Query(10, ge=1, le=1000),
+    limit: int = Query(10, ge=1, le=1000),
+    mode: Literal["smart", "weighted", "uniform", "new_first"] = "weighted",
+    all_items: bool = False,
     db: Session = Depends(get_db),
 ):
     stmt = select(Word).where(Word.deleted_at.is_(None)).options(selectinload(Word.tags), selectinload(Word.sentences))
@@ -62,7 +67,7 @@ async def word_session(
         stmt = stmt.where(Word.part_of_speech == part_of_speech)
     if tag:
         stmt = stmt.join(Word.tags).where(Tag.name == tag)
-    return weighted_sample(db.scalars(stmt).unique().all(), limit)
+    return sample_review_items(db.scalars(stmt).unique().all(), limit, mode, all_items=all_items)
 
 
 @router.post("/words/{word_id}", response_model=WordOut)

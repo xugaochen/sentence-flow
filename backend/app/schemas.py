@@ -93,6 +93,7 @@ class WordBase(BaseModel):
     meaning: str = Field(min_length=1)
     language: Language
     notes: str = ""
+    conjugation: str = ""
     part_of_speech: str = "other"
     tags: list[str] = Field(default_factory=list)
 
@@ -101,7 +102,7 @@ class WordBase(BaseModel):
     def strip_fields(cls, value: str) -> str:
         return value.strip()
 
-    @field_validator("notes")
+    @field_validator("notes", "conjugation")
     @classmethod
     def strip_optional_text(cls, value: str) -> str:
         return value.strip()
@@ -128,6 +129,7 @@ class WordOut(BaseModel):
     word: str
     meaning: str
     notes: str
+    conjugation: str
     language: str
     part_of_speech: str
     mastery: str

@@ -11,6 +11,7 @@ def ensure_schema(engine: Engine) -> None:
         },
         "words": {
             "notes": "TEXT NOT NULL DEFAULT ''",
+            "conjugation": "TEXT NOT NULL DEFAULT ''",
             "deleted_at": "DATETIME",
         },
     }
@@ -22,6 +23,18 @@ def ensure_schema(engine: Engine) -> None:
             for name, definition in columns.items():
                 if name not in existing:
                     connection.exec_driver_sql(f'ALTER TABLE "{table}" ADD COLUMN "{name}" {definition}')
+        if inspector.has_table("words"):
+            marker = "直陈式现在时："
+            connection.exec_driver_sql(
+                """
+                UPDATE words
+                SET conjugation = trim(substr(notes, instr(notes, :marker) + length(:marker))),
+                    notes = rtrim(substr(notes, 1, instr(notes, :marker) - 1), char(10) || char(13) || ' ')
+                WHERE instr(notes, :marker) > 0
+                  AND trim(COALESCE(conjugation, '')) = ''
+                """,
+                {"marker": marker},
+            )
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_sentences_deleted_at ON sentences (deleted_at)"
         )

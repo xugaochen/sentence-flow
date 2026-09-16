@@ -45,6 +45,7 @@ async def request_flow():
             "meaning": "分手",
             "language": "ja",
             "notes": "一段动词，て形是別れて。",
+            "conjugation": "辞书形：別れる；ます形：別れます。",
             "part_of_speech": "动词",
             "tags": ["日常"],
         })
@@ -52,6 +53,8 @@ async def request_flow():
         word = word_response.json()
         assert word["sentences"][0]["id"] == sentence["id"]
         assert word["notes"].startswith("一段动词")
+        assert word["conjugation"].startswith("辞书形")
+        assert [item["id"] for item in (await client.get("/api/words?q=ます形")).json()] == [word["id"]]
 
         second_word_response = await client.post(f"/api/sentences/{sentence['id']}/words", json={
             "word": "明るい",
@@ -117,7 +120,15 @@ async def request_flow():
             "tags": ["常用"],
         })
         assert english_word_response.status_code == 201
+        english_word = english_word_response.json()
         assert [item["id"] for item in (await client.get("/api/reviews/sentences?language=en&limit=10")).json()] == [english_sentence["id"]]
+
+        for kind, item_id in (("sentences", english_sentence["id"]), ("words", english_word["id"])):
+            uniform = (await client.get(f"/api/reviews/{kind}?language=en&mode=uniform&limit=3")).json()
+            assert [item["id"] for item in uniform] == [item_id, item_id, item_id]
+            uniform_all = (await client.get(f"/api/reviews/{kind}?language=en&mode=uniform&limit=30&all_items=true")).json()
+            assert [item["id"] for item in uniform_all] == [item_id]
+            assert (await client.get(f"/api/reviews/{kind}?mode=invalid")).status_code == 422
 
         stats = (await client.get("/api/stats")).json()
         assert stats == {
@@ -198,6 +209,9 @@ async def data_safety_flow():
         document = json.loads(json_export_response.content)
         exported_word = next(item for item in document["words"] if item["id"] == word["id"])
         assert exported_word["word"] == "年上"
+        assert "conjugation" in exported_word
+        exported_verb = next(item for item in document["words"] if item["word"] == "別れる")
+        assert exported_verb["conjugation"].startswith("辞书形")
         assert exported_word["deleted_at"] is not None
         assert {"schema_version", "sentences", "words", "sentence_words", "review_logs"}.issubset(document)
 
@@ -207,6 +221,7 @@ async def data_safety_flow():
             assert {"manifest.json", "sentences.csv", "words.csv", "sentence_words.csv", "review_logs.csv"}.issubset(archive.namelist())
             rows = list(csv.DictReader(io.TextIOWrapper(archive.open("words.csv"), encoding="utf-8-sig")))
             assert next(item for item in rows if int(item["id"]) == word["id"])["word"] == "年上"
+            assert "conjugation" in rows[0]
 
         restored_word = await client.post(f"/api/trash/words/{word['id']}/restore", json={})
         assert restored_word.status_code == 200
@@ -229,3 +244,40 @@ async def data_safety_flow():
 
 def test_trash_restore_purge_and_exports():
     asyncio.run(data_safety_flow())
+
+
+def test_frontend_fallback_and_api_404(tmp_path, monkeypatch):
+    import app.main as main_module
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+
+    index = tmp_path / "index.html"
+    index.write_text("<!doctype html><title>Sentence Flow</title>", encoding="utf-8")
+    monkeypatch.setattr(main_module, "FRONTEND_INDEX", index)
+
+    async def call_frontend():
+        root = await main_module.frontend_app("")
+        nested = await main_module.frontend_app("sentences/128")
+        assert isinstance(root, FileResponse)
+        assert isinstance(nested, FileResponse)
+        assert root.path == index
+        assert nested.path == index
+
+        try:
+            await main_module.frontend_app("api/not-found")
+        except HTTPException as error:
+            assert error.status_code == 404
+            assert error.detail == "接口不存在"
+        else:
+            raise AssertionError("不存在的 API 应返回 404")
+
+        monkeypatch.setattr(main_module, "FRONTEND_INDEX", tmp_path / "missing.html")
+        try:
+            await main_module.frontend_app("")
+        except HTTPException as error:
+            assert error.status_code == 503
+            assert "前端尚未构建" in error.detail
+        else:
+            raise AssertionError("缺少前端构建时应返回 503")
+
+    asyncio.run(call_frontend())
