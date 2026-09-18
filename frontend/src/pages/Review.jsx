@@ -7,6 +7,7 @@ import SpeakButton from '../components/SpeakButton'
 import { Empty, ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, PARTS_OF_SPEECH } from '../constants'
 import { getReviewStartNotice, splitCurrentAndFutureMatches } from '../utils/reviewQueue'
+import { getReviewShortcut } from '../utils/reviewShortcuts'
 import { normalizeAnswer } from '../utils/textDiff'
 
 const REVIEW_MODES = [
@@ -25,17 +26,20 @@ export default function Review({ type }) {
   const [notice, setNotice] = useState('')
   const [trashStatus, setTrashStatus] = useState(null)
   const [questionInstance, setQuestionInstance] = useState(0)
+  const [actionPending, setActionPending] = useState(false)
   const [results, setResults] = useState({ unknown: 0, fuzzy: 0, known: 0, skipped: 0 }); const inputRef = useRef(null)
+  const speakRef = useRef(null)
   const activeRunRef = useRef(0)
+  const actionPendingRef = useRef(false)
   const itemsRef = useRef(items)
   const phaseRef = useRef(phase)
   itemsRef.current = items
   phaseRef.current = phase
 
   useEffect(() => { api.get(`/tags?kind=${isSentence ? 'sentence' : 'word'}`).then(setTags).catch(() => {}) }, [isSentence])
-  useEffect(() => { activeRunRef.current += 1; setPhase('setup'); setItems([]); setIndex(0); setAnswer(''); setSubmitted(false); setError(''); setNotice(''); setTrashStatus(null) }, [type])
+  useEffect(() => { activeRunRef.current += 1; actionPendingRef.current = false; setActionPending(false); setPhase('setup'); setItems([]); setIndex(0); setAnswer(''); setSubmitted(false); setError(''); setNotice(''); setTrashStatus(null) }, [type])
   const start = async (event) => {
-    event.preventDefault(); activeRunRef.current += 1; setPhase('loading'); setError(''); setNotice(''); setTrashStatus(null); setItems([]); setIndex(0); setAnswer(''); setSubmitted(false); setQuestionInstance((value) => value + 1)
+    event.preventDefault(); activeRunRef.current += 1; actionPendingRef.current = false; setActionPending(false); setPhase('loading'); setError(''); setNotice(''); setTrashStatus(null); setItems([]); setIndex(0); setAnswer(''); setSubmitted(false); setQuestionInstance((value) => value + 1)
     const params = {
       language: settings.language,
       tag: settings.tag,
@@ -54,6 +58,8 @@ export default function Review({ type }) {
   const matches = normalizeAnswer(answer) === normalizeAnswer(expected)
   useLayoutEffect(() => {
     if (phase !== 'review' || submitted || !current) return undefined
+    actionPendingRef.current = false
+    setActionPending(false)
     inputRef.current?.focus({ preventScroll: true })
     return undefined
   }, [phase, submitted, questionInstance])
@@ -68,6 +74,8 @@ export default function Review({ type }) {
     }
   }
   const skip = () => {
+    if (actionPendingRef.current) return
+    actionPendingRef.current = true
     setResults((previous) => ({ ...previous, skipped: previous.skipped + 1 }))
     advance('上一题已跳过，没有记录复习结果。')
   }
@@ -100,14 +108,43 @@ export default function Review({ type }) {
     })
   }
   const assess = async (mastery) => {
+    if (actionPendingRef.current) return
+    actionPendingRef.current = true
+    setActionPending(true)
     try {
       const updated = await api.post(`/reviews/${type}/${current.id}`, { mastery })
       updateCurrent(updated)
       setNotice('')
       setResults((previous) => ({ ...previous, [mastery]: previous[mastery] + 1 }))
       advance()
-    } catch (err) { setError(err.message) }
+    } catch (err) {
+      actionPendingRef.current = false
+      setError(err.message)
+    } finally {
+      setActionPending(false)
+    }
   }
+
+  useEffect(() => {
+    if (phase !== 'review') return undefined
+    const handleShortcut = (event) => {
+      const shortcut = getReviewShortcut(event, {
+        submitted,
+        isSentence,
+        hasAnswer: Boolean(answer.trim()),
+        busy: actionPendingRef.current,
+      })
+      if (!shortcut) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (shortcut.type === 'submit') submitAnswer(event)
+      else if (shortcut.type === 'skip') skip()
+      else if (shortcut.type === 'assess') void assess(shortcut.mastery)
+      else if (shortcut.type === 'speak') speakRef.current?.toggle()
+    }
+    document.addEventListener('keydown', handleShortcut)
+    return () => document.removeEventListener('keydown', handleShortcut)
+  }, [phase, submitted, isSentence, answer, current?.id, index, items.length])
 
   if (phase === 'loading') return <Loading />
   if (phase === 'setup') return <Setup isSentence={isSentence} settings={settings} setSettings={setSettings} tags={tags} start={start} error={error} />
@@ -125,19 +162,19 @@ export default function Review({ type }) {
         <h1>{isSentence ? current.chinese_text : current.meaning}</h1>
         {!submitted ? <form key={`${type}-${current.id}-${index}-${questionInstance}`} onSubmit={submitAnswer} className="answer-form">
           <label htmlFor="answer">请输入完整{isSentence ? LANGUAGES[current.language].label + '句子' : LANGUAGES[current.language].label}</label>
-          {isSentence ? <textarea id="answer" ref={inputRef} autoFocus rows="4" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="在这里写下你的答案…" onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitAnswer(e) }} /> : <input id="answer" ref={inputRef} autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="在这里写下你的答案…" />}
-          <p className="input-hint">{isSentence ? 'Ctrl + Enter 提交' : 'Enter 提交'} · 提交前不会显示答案</p>
+          {isSentence ? <textarea id="answer" ref={inputRef} autoFocus rows="4" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="在这里写下你的答案…" /> : <input id="answer" ref={inputRef} autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="在这里写下你的答案…" />}
+          <p className="input-hint">{isSentence ? 'Ctrl/Cmd + Enter 提交' : 'Enter 或 Ctrl/Cmd + Enter 提交'} · Ctrl/Cmd + Shift + Enter 跳过</p>
           <button className="button button-primary button-wide" disabled={!answer.trim()}>提交答案 <span>→</span></button>
-          <button type="button" className="review-skip-button" onClick={skip}>暂时跳过此题 <span>→</span></button>
+          <button type="button" className="review-skip-button" onClick={skip}>暂时跳过此题 <small>Ctrl/Cmd + Shift + Enter</small><span>→</span></button>
         </form> : <div className="answer-result">
           <AnswerDiff actual={answer} expected={expected} />
           <div className={`match-result ${matches ? 'match' : 'mismatch'}`}>{matches ? '✓ 完全一致' : '请对照高亮部分检查差异'}</div>
-          <div className="answer-tools"><SpeakButton text={expected} language={current.language} label={isSentence ? '朗读标准答案' : '朗读单词'} /></div>
+          <div className="answer-tools"><small className="answer-shortcut-hint">R　朗读 / 停止</small><SpeakButton ref={speakRef} text={expected} language={current.language} label={isSentence ? '朗读标准答案' : '朗读单词'} /></div>
           {isSentence ? <ReviewSentenceTools sentence={current} onUpdate={updateCurrent} onDelete={removeCurrent} /> : <>
             {current.notes && <div className="context-box notes-context"><span>注释 / 讲解</span><p>{current.notes}</p></div>}
             {current.sentences?.length > 0 && <div className="context-box"><span>来源句</span>{current.sentences.map((sentence) => <div key={sentence.id}><p lang={sentence.language}>{sentence.target_text}</p><small>{sentence.chinese_text}</small>{sentence.notes && <small className="source-notes">讲解：{sentence.notes}</small>}</div>)}</div>}
           </>}
-          <div className="assessment"><p>这一次，你掌握得怎么样？</p><div><button className="assess-unknown" onClick={() => assess('unknown')}><b>不会</b><small>需要多出现</small></button><button className="assess-fuzzy" onClick={() => assess('fuzzy')}><b>模糊</b><small>想起来但不稳</small></button><button className="assess-known" onClick={() => assess('known')}><b>会了</b><small>可以主动说出</small></button></div></div>
+          <div className="assessment"><p>这一次，你掌握得怎么样？按数字键可直接进入下一题。</p><div><button className="assess-known" disabled={actionPending} onClick={() => assess('known')}><b>1　会了</b><small>可以主动说出</small></button><button className="assess-fuzzy" disabled={actionPending} onClick={() => assess('fuzzy')}><b>2　模糊</b><small>想起来但不稳</small></button><button className="assess-unknown" disabled={actionPending} onClick={() => assess('unknown')}><b>3　不会</b><small>需要多出现</small></button></div></div>
         </div>}
         <ErrorMessage message={error} />
       </section>

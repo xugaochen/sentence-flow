@@ -1,10 +1,14 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
 const VOICE_LANGS = { ja: 'ja-JP', es: 'es-ES', en: 'en-US' }
 const LANGUAGE_NAMES = { ja: '日语', es: '西班牙语', en: '英语' }
 const DEFAULT_RATE = 0.9
 const MIN_RATE = 0.6
 const MAX_RATE = 1.2
+const DEFAULT_REPEAT = 1
+const MIN_REPEAT = 1
+const MAX_REPEAT = 10
+const REPEAT_DELAY_MS = 250
 const SETTINGS_KEY = 'sentence-flow.tts'
 
 let activePlayback = null
@@ -15,12 +19,18 @@ function clampRate(value) {
   return Math.min(MAX_RATE, Math.max(MIN_RATE, number))
 }
 
+function clampRepeat(value) {
+  const number = Math.round(Number(value))
+  if (!Number.isFinite(number)) return DEFAULT_REPEAT
+  return Math.min(MAX_REPEAT, Math.max(MIN_REPEAT, number))
+}
+
 function readSettings(language) {
   try {
     const stored = JSON.parse(window.localStorage.getItem(`${SETTINGS_KEY}.${language}`) || '{}')
-    return { voiceURI: typeof stored.voiceURI === 'string' ? stored.voiceURI : '', rate: clampRate(stored.rate) }
+    return { voiceURI: typeof stored.voiceURI === 'string' ? stored.voiceURI : '', rate: clampRate(stored.rate), repeat: clampRepeat(stored.repeat) }
   } catch {
-    return { voiceURI: '', rate: DEFAULT_RATE }
+    return { voiceURI: '', rate: DEFAULT_RATE, repeat: DEFAULT_REPEAT }
   }
 }
 
@@ -33,25 +43,32 @@ function writeSettings(language, settings) {
 }
 
 function stopActivePlayback() {
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
-  if (activePlayback) activePlayback.setSpeaking(false)
+  const playback = activePlayback
   activePlayback = null
+  if (playback?.timer) window.clearTimeout(playback.timer)
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+  if (playback) {
+    playback.setSpeaking(false)
+    playback.setCurrentRepeat(0)
+  }
 }
 
-export default function SpeakButton({ text, language, label = '朗读' }) {
+const SpeakButton = forwardRef(function SpeakButton({ text, language, label = '朗读' }, ref) {
   const instanceId = useId()
   const controlRef = useRef(null)
   const [voices, setVoices] = useState([])
   const [voiceURI, setVoiceURI] = useState('')
   const [rate, setRate] = useState(DEFAULT_RATE)
+  const [repeat, setRepeat] = useState(DEFAULT_REPEAT)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [speaking, setSpeaking] = useState(false)
+  const [currentRepeat, setCurrentRepeat] = useState(0)
   const supported = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
   const targetLanguage = VOICE_LANGS[language]
 
   useEffect(() => {
     if (!supported || !targetLanguage) {
-      setVoices([]); setVoiceURI(''); setRate(DEFAULT_RATE)
+      setVoices([]); setVoiceURI(''); setRate(DEFAULT_RATE); setRepeat(DEFAULT_REPEAT)
       return undefined
     }
 
@@ -73,8 +90,9 @@ export default function SpeakButton({ text, language, label = '朗读' }) {
       setVoices(matching)
       setVoiceURI(selected?.voiceURI || '')
       setRate(saved.rate)
+      setRepeat(saved.repeat)
       if (selected && selected.voiceURI !== saved.voiceURI) {
-        writeSettings(language, { voiceURI: selected.voiceURI, rate: saved.rate })
+        writeSettings(language, { voiceURI: selected.voiceURI, rate: saved.rate, repeat: saved.repeat })
       }
     }
 
@@ -113,37 +131,64 @@ export default function SpeakButton({ text, language, label = '朗读' }) {
     }
 
     stopActivePlayback()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = targetLanguage
-    utterance.voice = voice
-    utterance.rate = rate
-    utterance.pitch = 1
-    utterance.volume = 1
-
+    const playback = {
+      id: instanceId,
+      completed: 0,
+      repeat,
+      timer: null,
+      setSpeaking,
+      setCurrentRepeat,
+    }
     const finish = () => {
-      if (activePlayback?.utterance !== utterance) return
+      if (activePlayback !== playback) return
       activePlayback = null
       setSpeaking(false)
+      setCurrentRepeat(0)
     }
-    utterance.onend = finish
-    utterance.onerror = finish
-    activePlayback = { id: instanceId, utterance, setSpeaking }
+    const speakNext = () => {
+      if (activePlayback !== playback) return
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = targetLanguage
+      utterance.voice = voice
+      utterance.rate = rate
+      utterance.pitch = 1
+      utterance.volume = 1
+      setCurrentRepeat(playback.completed + 1)
+      utterance.onend = () => {
+        if (activePlayback !== playback) return
+        playback.completed += 1
+        if (playback.completed >= playback.repeat) finish()
+        else playback.timer = window.setTimeout(speakNext, REPEAT_DELAY_MS)
+      }
+      utterance.onerror = finish
+      window.speechSynthesis.speak(utterance)
+    }
+    activePlayback = playback
     setSpeaking(true)
-    window.speechSynthesis.speak(utterance)
+    speakNext()
   }
+
+  useImperativeHandle(ref, () => ({ toggle: toggleSpeech }), [toggleSpeech])
 
   const selectVoice = (event) => {
     const nextVoiceURI = event.target.value
     stopActivePlayback()
     setVoiceURI(nextVoiceURI)
-    writeSettings(language, { voiceURI: nextVoiceURI, rate })
+    writeSettings(language, { voiceURI: nextVoiceURI, rate, repeat })
   }
 
   const changeRate = (event) => {
     const nextRate = clampRate(event.target.value)
     stopActivePlayback()
     setRate(nextRate)
-    writeSettings(language, { voiceURI, rate: nextRate })
+    writeSettings(language, { voiceURI, rate: nextRate, repeat })
+  }
+
+  const changeRepeat = (event) => {
+    const nextRepeat = clampRepeat(event.target.value)
+    stopActivePlayback()
+    setRepeat(nextRepeat)
+    writeSettings(language, { voiceURI, rate, repeat: nextRepeat })
   }
 
   const unavailableMessage = !supported
@@ -156,9 +201,9 @@ export default function SpeakButton({ text, language, label = '朗读' }) {
       className={`speak-button ${speaking ? 'speaking' : ''}`}
       onClick={toggleSpeech}
       disabled={unavailable || !text}
-      title={unavailable ? unavailableMessage : `${label}（${voice.name}，${rate.toFixed(2)} 倍速）`}
+      title={unavailable ? unavailableMessage : `${label}（${voice.name}，${rate.toFixed(2)} 倍速，连续 ${repeat} 遍）`}
       aria-label={speaking ? '停止朗读' : label}
-    >{speaking ? '■' : '♪'} <span>{speaking ? '停止朗读' : label}</span></button>
+    >{speaking ? '■' : '♪'} <span>{speaking ? `停止朗读 ${currentRepeat}/${repeat}` : label}</span></button>
     <button
       type="button"
       className="speak-settings-toggle"
@@ -172,9 +217,12 @@ export default function SpeakButton({ text, language, label = '朗读' }) {
       {unavailable ? <p className="speak-unavailable">{unavailableMessage}</p> : <>
         <label><span>系统音色</span><select value={voiceURI} onChange={selectVoice}>{voices.map((item) => <option key={item.voiceURI} value={item.voiceURI}>{item.name} · {item.lang}{item.localService ? ' · 本地' : ''}</option>)}</select></label>
         <label className="speak-rate"><span>语速 <b>{rate.toFixed(2)}×</b></span><input type="range" min={MIN_RATE} max={MAX_RATE} step="0.05" value={rate} onChange={changeRate} /></label>
+        <label><span>连续复读</span><select value={repeat} onChange={changeRepeat}>{Array.from({ length: MAX_REPEAT }, (_, index) => index + 1).map((count) => <option value={count} key={count}>{count} 遍</option>)}</select></label>
         <button type="button" className="button button-small button-quiet speak-preview" onClick={toggleSpeech}>{speaking ? '■ 停止试听' : '♪ 试听当前内容'}</button>
         <small>设置仅保存在当前浏览器中，不同语言会分别记忆。</small>
       </>}
     </div>}
   </div>
-}
+})
+
+export default SpeakButton

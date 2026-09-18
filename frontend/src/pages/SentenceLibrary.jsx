@@ -12,6 +12,7 @@ export default function SentenceLibrary() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(location.state?.notice || '')
+  const [savingMastery, setSavingMastery] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -24,6 +25,35 @@ export default function SentenceLibrary() {
     event.preventDefault(); event.stopPropagation()
     if (!window.confirm(`确定把这句话移至回收站吗？\n${item.target_text}`)) return
     await api.delete(`/sentences/${item.id}`); setError(''); setNotice('句子已移至回收站。'); load()
+  }
+
+  const updateMastery = async (event, item) => {
+    event.preventDefault(); event.stopPropagation()
+    const mastery = event.target.value
+    if (mastery === item.mastery || savingMastery === item.id) return
+
+    const previousMastery = item.mastery
+    setError('')
+    setSavingMastery(item.id)
+    setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, mastery } : entry))
+    try {
+      const updated = await api.put(`/sentences/${item.id}`, {
+        chinese_text: item.chinese_text,
+        target_text: item.target_text,
+        notes: item.notes,
+        language: item.language,
+        mastery,
+        tags: item.tags.map((tag) => tag.name),
+      })
+      setItems((current) => current
+        .map((entry) => entry.id === item.id ? updated : entry)
+        .filter((entry) => !filters.mastery || entry.mastery === filters.mastery))
+    } catch (err) {
+      setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, mastery: previousMastery } : entry))
+      setError(err.message)
+    } finally {
+      setSavingMastery(null)
+    }
   }
 
   return (
@@ -39,12 +69,14 @@ export default function SentenceLibrary() {
       {notice && <div className="success-banner">{notice} <Link to="/data">前往回收站</Link></div>}
       {loading ? <Loading /> : items.length === 0 ? <Empty title="还没有找到句子">换一个筛选条件，或添加第一句想说的话。</Empty> : (
         <div className="sentence-list">
-          {items.map((item, index) => <Link className="sentence-row" to={`/sentences/${item.id}`} key={item.id}>
-            <span className="row-index">{String(index + 1).padStart(2, '0')}</span>
-            <div className="sentence-copy"><p>{item.chinese_text}</p><h3 lang={item.language}>{item.target_text}</h3><div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div></div>
-            <div className="row-meta"><span className={`mastery ${MASTERY[item.mastery].className}`}>{MASTERY[item.mastery].label}</span><small>{LANGUAGES[item.language].label} · 复习 {item.review_count} 次</small><button className="text-danger" onClick={(event) => remove(event, item)}>移至回收站</button></div>
-            <span className="row-arrow">→</span>
-          </Link>)}
+          {items.map((item, index) => <div className="sentence-row" key={item.id}>
+            <Link className="sentence-copy-link" to={`/sentences/${item.id}`}>
+              <span className="row-index">{String(index + 1).padStart(2, '0')}</span>
+              <div className="sentence-copy"><p>{item.chinese_text}</p><h3 lang={item.language}>{item.target_text}</h3><div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div></div>
+            </Link>
+            <div className="row-meta"><select className={`mastery mastery-select ${MASTERY[item.mastery].className}`} aria-label={`修改“${item.target_text}”的熟练度`} title="点击修改熟练度" value={item.mastery} disabled={savingMastery === item.id} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} onChange={(event) => updateMastery(event, item)}>{Object.entries(MASTERY).map(([value, data]) => <option value={value} key={value}>{data.label}</option>)}</select><small>{LANGUAGES[item.language].label} · 复习 {item.review_count} 次</small><button className="text-danger" onClick={(event) => remove(event, item)}>移至回收站</button></div>
+            <Link className="row-arrow" aria-label={`查看句子：${item.target_text}`} to={`/sentences/${item.id}`}>→</Link>
+          </div>)}
         </div>
       )}
     </div>
