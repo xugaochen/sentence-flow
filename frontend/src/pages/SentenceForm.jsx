@@ -4,6 +4,7 @@ import { api } from '../api'
 import TagInput from '../components/TagInput'
 import { ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, MASTERY } from '../constants'
+import { useAppearance } from '../components/Appearance'
 
 const SENTENCE_PLACEHOLDERS = {
   ja: '別れてから、彼女は前より明るくなった。',
@@ -12,10 +13,11 @@ const SENTENCE_PLACEHOLDERS = {
 }
 
 export default function SentenceForm() {
+  const { workbench } = useAppearance()
   const { id } = useParams()
   const editing = Boolean(id)
   const navigate = useNavigate()
-  const [form, setForm] = useState({ chinese_text: '', target_text: '', notes: '', language: 'ja', mastery: 'unknown', tags: [] })
+  const [form, setForm] = useState({ chinese_text: '', english_text: '', target_text: '', notes: '', language: 'ja', mastery: 'unknown', tags: [] })
   const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(editing)
   const [saving, setSaving] = useState(false)
@@ -24,7 +26,7 @@ export default function SentenceForm() {
   useEffect(() => {
     api.get('/tags').then(setTags).catch(() => {})
     if (editing) api.get(`/sentences/${id}`).then((item) => {
-      setForm({ ...item, tags: item.tags.map((tag) => tag.name) })
+      setForm({ ...item, english_text: item.english_text || '', tags: item.tags.map((tag) => tag.name) })
     }).catch((err) => setError(err.message)).finally(() => setLoading(false))
   }, [editing, id])
 
@@ -39,19 +41,20 @@ export default function SentenceForm() {
   if (loading) return <Loading />
   return (
     <div className="narrow-page">
-      <Link className="back-link" to={editing ? `/sentences/${id}` : '/sentences'}>← 返回句子库</Link>
-      <div className="page-title"><p className="eyebrow">COLLECT</p><h1>{editing ? '编辑句子' : '收下一句想说的话'}</h1><p>先记下完整表达。单词可以在保存后，从句子详情中手动添加。</p></div>
+      <Link className="back-link" to={editing ? `/sentences/${id}` : '/sentences'}>{workbench ? '← Back' : '← 返回'}</Link>
+      <div className="page-title"><p className="eyebrow">COLLECT</p><h1>{workbench ? (editing ? 'Edit Sentence' : 'Add Sentence') : editing ? '编辑句子' : '收下一句想说的话'}</h1><p>{workbench ? 'Save a complete sentence. You can link words after saving.' : '先记下完整表达。单词可以在保存后，从句子详情中手动添加。'}</p></div>
       <form className="paper-form" onSubmit={submit}>
         <ErrorMessage message={error} />
-        <label><span>中文意思 <b>*</b></span><textarea rows="3" autoFocus required placeholder="例如：分手以后，她比以前开朗了。" value={form.chinese_text} onChange={(e) => setForm({ ...form, chinese_text: e.target.value })} /></label>
-        <label><span>目标语言句子 <b>*</b></span><textarea rows="4" required lang={form.language} placeholder={SENTENCE_PLACEHOLDERS[form.language]} value={form.target_text} onChange={(e) => setForm({ ...form, target_text: e.target.value })} /></label>
-        <label><span>注释 / 讲解 <small>可选</small></span><textarea rows="4" placeholder="记录语法、使用场景、容易混淆的地方或自己的理解。" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+        <label><span>{workbench ? 'Chinese Translation' : '中文意思'} <b>*</b></span><textarea rows="3" autoFocus required placeholder={workbench ? 'Enter the Chinese translation' : '例如：分手以后，她比以前开朗了。'} value={form.chinese_text} onChange={(e) => setForm({ ...form, chinese_text: e.target.value })} /></label>
+        {form.language === 'es' && <label><span>{workbench ? 'English Translation (optional)' : '英文翻译（可选）'}</span><textarea rows="3" lang="en" placeholder="Enter an English translation for English → Spanish review." value={form.english_text} onChange={(e) => setForm({ ...form, english_text: e.target.value })} /><small>{workbench ? 'Required for English prompts. Sentences without it remain available with Chinese prompts.' : '英文提示模式只抽取已填写英文翻译的句子；留空仍可用中文提示复习。'}</small></label>}
+        <label><span>{workbench ? 'Sentence' : '目标语言句子'} <b>*</b></span><textarea rows="4" required lang={form.language} placeholder={SENTENCE_PLACEHOLDERS[form.language]} value={form.target_text} onChange={(e) => setForm({ ...form, target_text: e.target.value })} /></label>
+        <label><span>{workbench ? 'Notes (optional)' : '注释 / 讲解（可选）'}</span><textarea rows="4" placeholder={workbench ? 'Grammar, usage or things to remember' : '记录语法、使用场景、容易混淆的地方或自己的理解。'} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
         <div className="form-row">
-          <fieldset><legend>语言</legend><div className="segmented">{Object.entries(LANGUAGES).map(([value, item]) => <button className={form.language === value ? 'active' : ''} type="button" key={value} onClick={() => setForm({ ...form, language: value })}>{item.label}</button>)}</div></fieldset>
-          {editing && <label><span>熟练度</span><select value={form.mastery} onChange={(e) => setForm({ ...form, mastery: e.target.value })}>{Object.entries(MASTERY).map(([value, item]) => <option value={value} key={value}>{item.label}</option>)}</select></label>}
+          <fieldset><legend>{workbench ? 'Language' : '语言'}</legend><div className="segmented">{Object.entries(LANGUAGES).map(([value, item]) => <button className={form.language === value ? 'active' : ''} type="button" key={value} onClick={() => setForm({ ...form, language: value })}>{workbench ? item.englishLabel : item.label}</button>)}</div></fieldset>
+          {editing && <label><span>{workbench ? 'Mastery' : '熟练度'}</span><select value={form.mastery} onChange={(e) => setForm({ ...form, mastery: e.target.value })}>{Object.entries(MASTERY).map(([value, item]) => <option value={value} key={value}>{workbench ? item.englishLabel : item.label}</option>)}</select></label>}
         </div>
-        <label><span>标签 <small>可选</small></span><TagInput value={form.tags} onChange={(value) => setForm({ ...form, tags: value })} suggestions={tags} /></label>
-        <div className="form-actions"><Link className="button button-quiet" to={editing ? `/sentences/${id}` : '/sentences'}>取消</Link><button className="button button-primary" disabled={saving}>{saving ? '正在保存…' : '保存句子'} <span>→</span></button></div>
+        <label><span>{workbench ? 'Tags (optional)' : '标签（可选）'}</span><TagInput value={form.tags} onChange={(value) => setForm({ ...form, tags: value })} suggestions={tags} /></label>
+        <div className="form-actions"><Link className="button button-quiet" to={editing ? `/sentences/${id}` : '/sentences'}>{workbench ? 'Cancel' : '取消'}</Link><button className="button button-primary" disabled={saving}>{workbench ? saving ? 'Saving…' : 'Save Sentence' : saving ? '正在保存…' : '保存句子'} <span>→</span></button></div>
       </form>
     </div>
   )

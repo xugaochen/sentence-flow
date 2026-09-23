@@ -26,11 +26,17 @@ def test_additive_migration_preserves_existing_rows(tmp_path: Path):
     inspector = inspect(engine)
     sentence_columns = {column["name"] for column in inspector.get_columns("sentences")}
     word_columns = {column["name"] for column in inspector.get_columns("words")}
-    assert {"notes", "deleted_at"}.issubset(sentence_columns)
+    assert {"notes", "deleted_at", "english_text"}.issubset(sentence_columns)
     assert {"notes", "conjugation", "deleted_at"}.issubset(word_columns)
     with engine.connect() as connection:
         assert connection.exec_driver_sql("SELECT chinese_text, notes, deleted_at FROM sentences").one() == ("原有句子", "", None)
+        assert connection.exec_driver_sql("SELECT english_text FROM sentences").scalar_one() == ""
         assert connection.exec_driver_sql("SELECT word, notes, conjugation, deleted_at FROM words").one() == ("hablar", "规则动词。", "yo hablo；tú hablas。", None)
         indexes = {row[1] for row in connection.exec_driver_sql("PRAGMA index_list('words')")}
         assert "ix_words_deleted_at" in indexes
+    with engine.begin() as connection:
+        connection.exec_driver_sql("UPDATE sentences SET english_text = 'An existing translation.'")
+    ensure_schema(engine)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT english_text FROM sentences").scalar_one() == "An existing translation."
     engine.dispose()

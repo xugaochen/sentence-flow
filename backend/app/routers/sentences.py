@@ -30,7 +30,7 @@ async def list_sentences(
 ):
     stmt = sentence_query().order_by(Sentence.created_at.desc())
     if q:
-        stmt = stmt.where(or_(Sentence.chinese_text.contains(q), Sentence.target_text.contains(q), Sentence.notes.contains(q)))
+        stmt = stmt.where(or_(Sentence.chinese_text.contains(q), Sentence.english_text.contains(q), Sentence.target_text.contains(q), Sentence.notes.contains(q)))
     if language:
         stmt = stmt.where(Sentence.language == language)
     if mastery:
@@ -62,7 +62,11 @@ async def update_sentence(sentence_id: int, payload: SentenceUpdate, db: Session
     sentence = db.scalar(select(Sentence).where(Sentence.id == sentence_id, Sentence.deleted_at.is_(None)))
     if sentence is None:
         raise HTTPException(status_code=404, detail="句子不存在")
-    for key, value in payload.model_dump(exclude={"tags"}).items():
+    values = payload.model_dump(exclude={"tags"})
+    # Older clients do not send this new optional field; preserve their translations.
+    if "english_text" not in payload.model_fields_set:
+        values.pop("english_text", None)
+    for key, value in values.items():
         setattr(sentence, key, value)
     sentence.tags = tags_for_names(db, payload.tags)
     db.commit()

@@ -3,8 +3,11 @@ import { Link, useLocation } from 'react-router-dom'
 import { api, queryString } from '../api'
 import { Empty, ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, MASTERY } from '../constants'
+import { useAppearance, useUiText } from '../components/Appearance'
 
 export default function SentenceLibrary() {
+  const t = useUiText()
+  const { workbench } = useAppearance()
   const location = useLocation()
   const [filters, setFilters] = useState({ q: '', language: '', mastery: '', tag: '' })
   const [items, setItems] = useState([])
@@ -23,8 +26,8 @@ export default function SentenceLibrary() {
 
   const remove = async (event, item) => {
     event.preventDefault(); event.stopPropagation()
-    if (!window.confirm(`确定把这句话移至回收站吗？\n${item.target_text}`)) return
-    await api.delete(`/sentences/${item.id}`); setError(''); setNotice('句子已移至回收站。'); load()
+    if (!window.confirm(workbench ? `Move this sentence to trash?\n${item.target_text}` : `确定把这句话移至回收站吗？\n${item.target_text}`)) return
+    await api.delete(`/sentences/${item.id}`); setError(''); setNotice(t('句子已移至回收站。')); load()
   }
 
   const updateMastery = async (event, item) => {
@@ -58,24 +61,24 @@ export default function SentenceLibrary() {
 
   return (
     <div>
-      <div className="library-header"><div className="page-title"><p className="eyebrow">SENTENCE LIBRARY</p><h1>句子库</h1><p>每一句，都是你真正想说的话。</p></div><Link className="button button-primary" to="/sentences/new">＋ 添加句子</Link></div>
+      <div className="library-header"><div className="page-title"><p className="eyebrow">{workbench ? 'SENTENCES' : 'SENTENCE LIBRARY'}</p><h1>{workbench ? 'Sentence Library' : '句子库'}</h1><p>{workbench ? 'Find and edit your saved sentences.' : '每一句，都是你真正想说的话。'}</p></div><Link className="button button-primary" to="/sentences/new">{workbench ? '+ Add Sentence' : '＋ 添加句子'}</Link></div>
       <div className="filterbar">
-        <label className="search"><span>⌕</span><input aria-label="搜索句子" placeholder="搜索中文或目标语言…" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} /></label>
-        <select aria-label="语言筛选" value={filters.language} onChange={(e) => setFilters({ ...filters, language: e.target.value })}><option value="">全部语言</option>{Object.entries(LANGUAGES).map(([v, x]) => <option key={v} value={v}>{x.label}</option>)}</select>
-        <select aria-label="标签筛选" value={filters.tag} onChange={(e) => setFilters({ ...filters, tag: e.target.value })}><option value="">全部标签</option>{tags.map((tag) => <option key={tag}>{tag}</option>)}</select>
-        <select aria-label="熟练度筛选" value={filters.mastery} onChange={(e) => setFilters({ ...filters, mastery: e.target.value })}><option value="">全部熟练度</option>{Object.entries(MASTERY).map(([v, x]) => <option key={v} value={v}>{x.label}</option>)}</select>
+        <label className="search"><span>⌕</span><input aria-label={t('搜索句子')} placeholder={t('搜索中文或目标语言…')} value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} /></label>
+        <select aria-label={t('语言筛选')} value={filters.language} onChange={(e) => setFilters({ ...filters, language: e.target.value })}><option value="">{t('全部语言')}</option>{Object.entries(LANGUAGES).map(([v, x]) => <option key={v} value={v}>{t(x.label)}</option>)}</select>
+        <select aria-label={t('标签筛选')} value={filters.tag} onChange={(e) => setFilters({ ...filters, tag: e.target.value })}><option value="">{t('全部标签')}</option>{tags.map((tag) => <option key={tag}>{tag}</option>)}</select>
+        <select aria-label={t('熟练度筛选')} value={filters.mastery} onChange={(e) => setFilters({ ...filters, mastery: e.target.value })}><option value="">{t('全部熟练度')}</option>{Object.entries(MASTERY).map(([v, x]) => <option key={v} value={v}>{t(x.label)}</option>)}</select>
       </div>
       <ErrorMessage message={error} />
-      {notice && <div className="success-banner">{notice} <Link to="/data">前往回收站</Link></div>}
-      {loading ? <Loading /> : items.length === 0 ? <Empty title="还没有找到句子">换一个筛选条件，或添加第一句想说的话。</Empty> : (
+      {notice && <div className="success-banner">{notice} <Link to="/data">{t('前往回收站')}</Link></div>}
+      {loading ? <Loading /> : items.length === 0 ? <Empty title={t('还没有找到句子')}>{t('换一个筛选条件，或添加第一句想说的话。')}</Empty> : (
         <div className="sentence-list">
           {items.map((item, index) => <div className="sentence-row" key={item.id}>
             <Link className="sentence-copy-link" to={`/sentences/${item.id}`}>
               <span className="row-index">{String(index + 1).padStart(2, '0')}</span>
               <div className="sentence-copy"><p>{item.chinese_text}</p><h3 lang={item.language}>{item.target_text}</h3><div className="tag-list">{item.tags.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}</div></div>
             </Link>
-            <div className="row-meta"><select className={`mastery mastery-select ${MASTERY[item.mastery].className}`} aria-label={`修改“${item.target_text}”的熟练度`} title="点击修改熟练度" value={item.mastery} disabled={savingMastery === item.id} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} onChange={(event) => updateMastery(event, item)}>{Object.entries(MASTERY).map(([value, data]) => <option value={value} key={value}>{data.label}</option>)}</select><small>{LANGUAGES[item.language].label} · 复习 {item.review_count} 次</small><button className="text-danger" onClick={(event) => remove(event, item)}>移至回收站</button></div>
-            <Link className="row-arrow" aria-label={`查看句子：${item.target_text}`} to={`/sentences/${item.id}`}>→</Link>
+            <div className="row-meta"><select className={`mastery mastery-select ${MASTERY[item.mastery].className}`} aria-label={workbench ? `Change mastery: ${item.target_text}` : `修改“${item.target_text}”的熟练度`} title={t('点击修改熟练度')} value={item.mastery} disabled={savingMastery === item.id} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} onChange={(event) => updateMastery(event, item)}>{Object.entries(MASTERY).map(([value, data]) => <option value={value} key={value}>{t(data.label)}</option>)}</select><small>{t(LANGUAGES[item.language].label)} · {workbench ? `${item.review_count} reviews` : `复习 ${item.review_count} 次`}</small><button className="text-danger" onClick={(event) => remove(event, item)}>{t('移至回收站')}</button></div>
+            <Link className="row-arrow" aria-label={workbench ? `View sentence: ${item.target_text}` : `查看句子：${item.target_text}`} to={`/sentences/${item.id}`}>→</Link>
           </div>)}
         </div>
       )}

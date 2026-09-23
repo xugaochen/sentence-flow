@@ -41,6 +41,29 @@ test('empty answers cannot be submitted but can be skipped', () => {
   assert.deepEqual(getReviewShortcut(keyEvent('Enter', { ctrlKey: true, shiftKey: true }), state), { type: 'skip' })
 })
 
+test('command-slash reveals empty or partial answers for both sentence and word review', () => {
+  for (const isSentence of [true, false]) {
+    for (const hasAnswer of [true, false]) {
+      const state = { submitted: false, isSentence, hasAnswer, busy: false }
+      assert.deepEqual(getReviewShortcut(keyEvent('/', { ctrlKey: true, target: { tagName: isSentence ? 'TEXTAREA' : 'INPUT' } }), state), { type: 'reveal' })
+      assert.deepEqual(getReviewShortcut(keyEvent('/', { metaKey: true }), state), { type: 'reveal' })
+      assert.deepEqual(getReviewShortcut(keyEvent('／', { ctrlKey: true, code: 'Slash' }), state), { type: 'reveal' })
+      assert.equal(getReviewShortcut(keyEvent('/'), state), null)
+      assert.equal(getReviewShortcut(keyEvent('/', { ctrlKey: true, shiftKey: true }), state), null)
+    }
+  }
+})
+
+test('reveal ignores composition, repeated keys, busy saves and already-revealed answers', () => {
+  const state = { submitted: false, isSentence: true, hasAnswer: false, busy: false }
+  for (const changes of [{ repeat: true }, { isComposing: true }, { keyCode: 229 }, { altKey: true }]) {
+    assert.equal(getReviewShortcut(keyEvent('/', { ctrlKey: true, ...changes }), state), null)
+  }
+  assert.equal(getReviewShortcut(keyEvent('/', { ctrlKey: true }), { ...state, submitted: true }), null)
+  assert.equal(getReviewShortcut(keyEvent('/', { ctrlKey: true }), { ...state, busy: true }), null)
+  assert.equal(getReviewShortcut(keyEvent('Enter', { isComposing: true }), { ...state, isSentence: false, hasAnswer: true }), null)
+})
+
 
 test('number keys map to known, fuzzy, and unknown after revealing the answer', () => {
   const state = { submitted: true, isSentence: true, hasAnswer: true, busy: false }

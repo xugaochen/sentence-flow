@@ -11,7 +11,12 @@ import WordLibrary from './pages/WordLibrary'
 import WordDetail from './pages/WordDetail'
 import DataManagement from './pages/DataManagement'
 import Review from './pages/Review'
+import { AppearanceProvider } from './components/Appearance'
+import { applyAppearance, readAppearance } from './utils/appearance'
 import './styles.css'
+import './workbench.css'
+
+applyAppearance(readAppearance())
 
 const router = createBrowserRouter([
   {
@@ -33,5 +38,5 @@ const router = createBrowserRouter([
 ])
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><RouterProvider router={router} /></React.StrictMode>,
+  <React.StrictMode><AppearanceProvider><RouterProvider router={router} /></AppearanceProvider></React.StrictMode>,
 )

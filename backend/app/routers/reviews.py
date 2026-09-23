@@ -17,10 +17,21 @@ from ..services import sample_review_items
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 ReviewMode = Literal["recent", "older", "smart", "weighted", "uniform", "new_first"]
+PromptLanguage = Literal["zh", "en"]
 
 
-def session_items(db, item_type, language, part_of_speech, tag, limit, mode, all_items):
+def prompt_items(items, item_type, language, prompt_language):
+    if prompt_language == "zh":
+        return items, 0
+    if item_type != "sentence" or language != "es":
+        raise HTTPException(status_code=400, detail="English prompts are available for Spanish sentence review only.")
+    translated = [item for item in items if item.english_text.strip()]
+    return translated, len(items) - len(translated)
+
+
+def session_items(db, item_type, language, part_of_speech, tag, limit, mode, all_items, prompt_language="zh"):
     items = review_items(db, item_type, language=language, part_of_speech=part_of_speech, tag=tag)
+    items, _ = prompt_items(items, item_type, language, prompt_language)
     if mode in ("recent", "older"):
         now = datetime.now(timezone.utc)
         counts = review_counts_today(db, item_type, now=now)
@@ -34,16 +45,22 @@ async def review_overview(
     kind: Literal["sentences", "words"],
     language: str | None = None,
     part_of_speech: str | None = None,
+    prompt_language: PromptLanguage = "zh",
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
     item_type = "sentence" if kind == "sentences" else "word"
     items = review_items(db, item_type, language=language, part_of_speech=part_of_speech)
+    items, missing_english_count = prompt_items(items, item_type, language, prompt_language)
     counts = review_counts_today(db, item_type, now=now)
+    pools = {mode: scheduled_review_pool(items, mode, counts, now=now).overview() for mode in ("recent", "older")}
+    if not items and missing_english_count:
+        for pool in pools.values():
+            pool["empty_reason"] = "missing_translation"
     return {
-        "recent": scheduled_review_pool(items, "recent", counts, now=now).overview(),
-        "older": scheduled_review_pool(items, "older", counts, now=now).overview(),
+        **pools,
         "today": today_review_stats(db, language=language, part_of_speech=part_of_speech, now=now),
+        "missing_english_count": missing_english_count,
     }
 
 
@@ -54,9 +71,10 @@ async def sentence_session(
     limit: int = Query(10, ge=1, le=1000),
     mode: ReviewMode = "weighted",
     all_items: bool = False,
+    prompt_language: PromptLanguage = "zh",
     db: Session = Depends(get_db),
 ):
-    return session_items(db, "sentence", language, None, tag, limit, mode, all_items)
+    return session_items(db, "sentence", language, None, tag, limit, mode, all_items, prompt_language)
 
 
 @router.post("/sentences/{sentence_id}", response_model=SentenceOut)

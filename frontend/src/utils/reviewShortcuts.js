@@ -13,12 +13,13 @@ export function isEditableReviewTarget(target) {
 }
 
 export function getReviewShortcut(event, { submitted, isSentence, hasAnswer, busy }) {
-  if (busy || event.repeat) return null
+  if (busy || event.repeat || event.isComposing || event.keyCode === 229 || event.altKey) return null
 
   const commandKey = event.ctrlKey || event.metaKey
   const isEnter = event.key === 'Enter'
 
   if (!submitted) {
+    if (commandKey && !event.shiftKey && (event.key === '/' || event.code === 'Slash')) return { type: 'reveal' }
     if (isEnter && commandKey && event.shiftKey) return { type: 'skip' }
     if (!hasAnswer || !isEnter || event.shiftKey) return null
     if (commandKey || !isSentence) return { type: 'submit' }

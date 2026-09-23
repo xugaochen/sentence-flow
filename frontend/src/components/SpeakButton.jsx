@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { useAppearance, useUiText } from './Appearance'
 
 const VOICE_LANGS = { ja: 'ja-JP', es: 'es-ES', en: 'en-US' }
 const LANGUAGE_NAMES = { ja: '日语', es: '西班牙语', en: '英语' }
@@ -54,6 +55,9 @@ function stopActivePlayback() {
 }
 
 const SpeakButton = forwardRef(function SpeakButton({ text, language, label = '朗读' }, ref) {
+  const { workbench } = useAppearance()
+  const t = useUiText()
+  const displayLabel = t(label)
   const instanceId = useId()
   const controlRef = useRef(null)
   const [voices, setVoices] = useState([])
@@ -192,8 +196,8 @@ const SpeakButton = forwardRef(function SpeakButton({ text, language, label = '�
   }
 
   const unavailableMessage = !supported
-    ? '当前浏览器不支持系统朗读'
-    : `系统中没有可用的${LANGUAGE_NAMES[language] || '目标语言'}语音，请安装对应的 Windows 语言语音包`
+    ? t('当前浏览器不支持系统朗读')
+    : workbench ? `No ${t(LANGUAGE_NAMES[language]) || 'matching'} voice is available. Install a voice for this language in Windows Settings.` : `系统中没有可用的${LANGUAGE_NAMES[language] || '目标语言'}语音，请安装对应的 Windows 语言语音包`
 
   return <div className="speak-control" ref={controlRef}>
     <button
@@ -201,25 +205,25 @@ const SpeakButton = forwardRef(function SpeakButton({ text, language, label = '�
       className={`speak-button ${speaking ? 'speaking' : ''}`}
       onClick={toggleSpeech}
       disabled={unavailable || !text}
-      title={unavailable ? unavailableMessage : `${label}（${voice.name}，${rate.toFixed(2)} 倍速，连续 ${repeat} 遍）`}
-      aria-label={speaking ? '停止朗读' : label}
-    >{speaking ? '■' : '♪'} <span>{speaking ? `停止朗读 ${currentRepeat}/${repeat}` : label}</span></button>
+      title={unavailable ? unavailableMessage : `${displayLabel} · ${voice.name} · ${rate.toFixed(2)}× · ${repeat} ${workbench ? 'times' : '遍'}`}
+      aria-label={speaking ? t('停止朗读') : displayLabel}
+    >{speaking ? '■' : '♪'} <span>{speaking ? `${t('停止朗读')} ${currentRepeat}/${repeat}` : displayLabel}</span></button>
     <button
       type="button"
       className="speak-settings-toggle"
       onClick={() => setSettingsOpen((open) => !open)}
       aria-expanded={settingsOpen}
-      aria-label="朗读设置"
-      title="朗读设置"
+      aria-label={t('朗读设置')}
+      title={t('朗读设置')}
     >⚙</button>
-    {settingsOpen && <div className="speak-settings" role="dialog" aria-label="朗读设置">
-      <div className="speak-settings-heading"><strong>朗读设置</strong><button type="button" onClick={() => setSettingsOpen(false)} aria-label="关闭朗读设置">×</button></div>
+    {settingsOpen && <div className="speak-settings" role="dialog" aria-label={t('朗读设置')}>
+      <div className="speak-settings-heading"><strong>{t('朗读设置')}</strong><button type="button" onClick={() => setSettingsOpen(false)} aria-label={t('关闭朗读设置')}>×</button></div>
       {unavailable ? <p className="speak-unavailable">{unavailableMessage}</p> : <>
-        <label><span>系统音色</span><select value={voiceURI} onChange={selectVoice}>{voices.map((item) => <option key={item.voiceURI} value={item.voiceURI}>{item.name} · {item.lang}{item.localService ? ' · 本地' : ''}</option>)}</select></label>
-        <label className="speak-rate"><span>语速 <b>{rate.toFixed(2)}×</b></span><input type="range" min={MIN_RATE} max={MAX_RATE} step="0.05" value={rate} onChange={changeRate} /></label>
-        <label><span>连续复读</span><select value={repeat} onChange={changeRepeat}>{Array.from({ length: MAX_REPEAT }, (_, index) => index + 1).map((count) => <option value={count} key={count}>{count} 遍</option>)}</select></label>
-        <button type="button" className="button button-small button-quiet speak-preview" onClick={toggleSpeech}>{speaking ? '■ 停止试听' : '♪ 试听当前内容'}</button>
-        <small>设置仅保存在当前浏览器中，不同语言会分别记忆。</small>
+        <label><span>{t('系统音色')}</span><select value={voiceURI} onChange={selectVoice}>{voices.map((item) => <option key={item.voiceURI} value={item.voiceURI}>{item.name} · {item.lang}{item.localService ? t(' · 本地') : ''}</option>)}</select></label>
+        <label className="speak-rate"><span>{t('语速')} <b>{rate.toFixed(2)}×</b></span><input type="range" min={MIN_RATE} max={MAX_RATE} step="0.05" value={rate} onChange={changeRate} /></label>
+        <label><span>{t('连续复读')}</span><select value={repeat} onChange={changeRepeat}>{Array.from({ length: MAX_REPEAT }, (_, index) => index + 1).map((count) => <option value={count} key={count}>{count} {workbench ? 'times' : '遍'}</option>)}</select></label>
+        <button type="button" className="button button-small button-quiet speak-preview" onClick={toggleSpeech}>{speaking ? t('■ 停止试听') : t('♪ 试听当前内容')}</button>
+        <small>{t('设置仅保存在当前浏览器中，不同语言会分别记忆。')}</small>
       </>}
     </div>}
   </div>

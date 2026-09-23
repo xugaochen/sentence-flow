@@ -37,6 +37,7 @@ class Sentence(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chinese_text: Mapped[str] = mapped_column(Text)
+    english_text: Mapped[str] = mapped_column(Text, default="")
     target_text: Mapped[str] = mapped_column(Text)
     notes: Mapped[str] = mapped_column(Text, default="")
     language: Mapped[str] = mapped_column(String(12), index=True)

@@ -1,6 +1,8 @@
+import { useUiText } from './Appearance'
 import { useState } from 'react'
 
 export default function TagInput({ value, onChange, suggestions = [] }) {
+  const t = useUiText()
   const [draft, setDraft] = useState('')
   const add = (raw) => {
     const tags = raw.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean)
@@ -14,7 +16,7 @@ export default function TagInput({ value, onChange, suggestions = [] }) {
         <input
           value={draft}
           list="tag-suggestions"
-          placeholder={value.length ? '继续添加' : '输入后按回车，可用逗号分隔'}
+          placeholder={value.length ? t('继续添加') : t('输入后按回车，可用逗号分隔')}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={() => draft && add(draft)}
           onKeyDown={(event) => {
@@ -26,4 +28,3 @@ export default function TagInput({ value, onChange, suggestions = [] }) {
     </div>
   )
 }
-

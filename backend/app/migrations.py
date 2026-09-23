@@ -6,6 +6,7 @@ def ensure_schema(engine: Engine) -> None:
     inspector = inspect(engine)
     additions = {
         "sentences": {
+            "english_text": "TEXT NOT NULL DEFAULT ''",
             "notes": "TEXT NOT NULL DEFAULT ''",
             "deleted_at": "DATETIME",
         },

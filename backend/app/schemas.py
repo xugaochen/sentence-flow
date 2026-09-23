@@ -16,6 +16,7 @@ class TagOut(BaseModel):
 
 class SentenceBase(BaseModel):
     chinese_text: str = Field(min_length=1)
+    english_text: str = ""
     target_text: str = Field(min_length=1)
     language: Language
     notes: str = ""
@@ -29,7 +30,7 @@ class SentenceBase(BaseModel):
             raise ValueError("内容不能为空")
         return value
 
-    @field_validator("notes")
+    @field_validator("notes", "english_text")
     @classmethod
     def strip_notes(cls, value: str) -> str:
         return value.strip()
@@ -62,6 +63,7 @@ class SentenceBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     chinese_text: str
+    english_text: str
     target_text: str
     language: str
     notes: str
@@ -71,6 +73,7 @@ class SentenceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     chinese_text: str
+    english_text: str
     target_text: str
     notes: str
     language: str
@@ -150,6 +153,7 @@ class TrashSentenceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     chinese_text: str
+    english_text: str
     target_text: str
     language: str
     deleted_at: datetime
@@ -177,7 +181,7 @@ class ReviewModeOverview(BaseModel):
     available_count: int
     candidate_count: int
     daily_limit_count: int
-    empty_reason: Literal["no_items", "all_known", "no_recent", "no_older", "daily_limit", "already_reviewed_today"] | None
+    empty_reason: Literal["no_items", "all_known", "no_recent", "no_older", "daily_limit", "already_reviewed_today", "missing_translation"] | None
     round_kind: Literal["first", "repeat"] | None
 
 
@@ -191,6 +195,7 @@ class ReviewOverview(BaseModel):
     recent: ReviewModeOverview
     older: ReviewModeOverview
     today: TodayReviewStats
+    missing_english_count: int = 0
 
 
 class StatsOut(BaseModel):
