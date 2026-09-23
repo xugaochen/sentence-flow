@@ -1,11 +1,10 @@
-from datetime import datetime, time, timezone
-
 from fastapi import APIRouter, Depends
-from sqlalchemy import and_, distinct, exists, func, or_, select
+from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import ReviewLog, Sentence, Tag, Word, sentence_tags, word_tags
+from ..models import Sentence, Tag, Word, sentence_tags, word_tags
+from ..review_schedule import today_review_stats
 from ..schemas import StatsOut
 
 
@@ -14,9 +13,7 @@ router = APIRouter(tags=["meta"])
 
 @router.get("/stats", response_model=StatsOut)
 async def stats(db: Session = Depends(get_db)):
-    local_now = datetime.now().astimezone()
-    local_start = datetime.combine(local_now.date(), time.min, tzinfo=local_now.tzinfo)
-    today_start = local_start.astimezone(timezone.utc)
+    today = today_review_stats(db)
     return StatsOut(
         sentence_total=db.scalar(select(func.count(Sentence.id)).where(Sentence.deleted_at.is_(None))) or 0,
         sentence_ja=db.scalar(select(func.count(Sentence.id)).where(Sentence.language == "ja", Sentence.deleted_at.is_(None))) or 0,
@@ -26,21 +23,9 @@ async def stats(db: Session = Depends(get_db)):
         word_ja=db.scalar(select(func.count(Word.id)).where(Word.language == "ja", Word.deleted_at.is_(None))) or 0,
         word_es=db.scalar(select(func.count(Word.id)).where(Word.language == "es", Word.deleted_at.is_(None))) or 0,
         word_en=db.scalar(select(func.count(Word.id)).where(Word.language == "en", Word.deleted_at.is_(None))) or 0,
-        reviewed_today=db.scalar(
-            select(func.count(ReviewLog.id)).where(
-                ReviewLog.reviewed_at >= today_start,
-                or_(
-                    and_(
-                        ReviewLog.item_type == "sentence",
-                        exists(select(Sentence.id).where(Sentence.id == ReviewLog.item_id, Sentence.deleted_at.is_(None))),
-                    ),
-                    and_(
-                        ReviewLog.item_type == "word",
-                        exists(select(Word.id).where(Word.id == ReviewLog.item_id, Word.deleted_at.is_(None))),
-                    ),
-                ),
-            )
-        ) or 0,
+        reviewed_today=today["review_count"],
+        reviewed_sentences_today=today["sentence_count"],
+        reviewed_words_today=today["word_count"],
     )
 
 

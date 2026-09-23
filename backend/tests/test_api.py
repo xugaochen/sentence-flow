@@ -141,6 +141,8 @@ async def request_flow():
             "word_es": 0,
             "word_en": 1,
             "reviewed_today": 1,
+            "reviewed_sentences_today": 1,
+            "reviewed_words_today": 0,
         }
 
         sentences = (await client.get("/api/sentences?tag=日常&mastery=known")).json()

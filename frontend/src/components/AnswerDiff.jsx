@@ -13,7 +13,7 @@ function DiffLine({ parts, side }) {
 export default function AnswerDiff({ actual, expected }) {
   const parts = diffText(actual, expected)
   return <div className="comparison">
-    <div><span>你的答案</span><DiffLine parts={parts} side="actual" /></div>
+    <div><span>你的答案</span>{actual.trim() ? <DiffLine parts={parts} side="actual" /> : <p className="answer-unanswered">未作答</p>}</div>
     <div><span>标准答案</span><DiffLine parts={parts} side="expected" /></div>
   </div>
 }

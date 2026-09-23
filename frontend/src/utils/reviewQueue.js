@@ -1,3 +1,9 @@
+// The per-question lock prevents duplicate actions until a render. It must not
+// trap a finished round; pending network writes still block leaving the page.
+export function canLeaveReview({ phase, actionPending, editorPending, actionLocked }) {
+  return !actionPending && !editorPending && (phase !== 'review' || !actionLocked)
+}
+
 export function removeCurrentAndFutureMatches(items, index, itemId) {
   return splitCurrentAndFutureMatches(items, index, itemId).remaining
 }

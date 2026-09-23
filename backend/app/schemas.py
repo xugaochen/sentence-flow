@@ -173,6 +173,26 @@ class ReviewResult(BaseModel):
     mastery: Mastery
 
 
+class ReviewModeOverview(BaseModel):
+    available_count: int
+    candidate_count: int
+    daily_limit_count: int
+    empty_reason: Literal["no_items", "all_known", "no_recent", "no_older", "daily_limit", "already_reviewed_today"] | None
+    round_kind: Literal["first", "repeat"] | None
+
+
+class TodayReviewStats(BaseModel):
+    sentence_count: int
+    word_count: int
+    review_count: int
+
+
+class ReviewOverview(BaseModel):
+    recent: ReviewModeOverview
+    older: ReviewModeOverview
+    today: TodayReviewStats
+
+
 class StatsOut(BaseModel):
     sentence_total: int
     sentence_ja: int
@@ -183,3 +203,5 @@ class StatsOut(BaseModel):
     word_es: int
     word_en: int
     reviewed_today: int
+    reviewed_sentences_today: int
+    reviewed_words_today: int

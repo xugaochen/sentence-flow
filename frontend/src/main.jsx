@@ -26,8 +26,8 @@ const router = createBrowserRouter([
       { path: '/words', element: <WordLibrary /> },
       { path: '/words/:id', element: <WordDetail /> },
       { path: '/data', element: <DataManagement /> },
-      { path: '/review/sentences', element: <Review type="sentences" /> },
-      { path: '/review/words', element: <Review type="words" /> },
+      { path: '/review/sentences', element: <Review key="sentences" type="sentences" /> },
+      { path: '/review/words', element: <Review key="words" type="words" /> },
     ],
   },
 ])

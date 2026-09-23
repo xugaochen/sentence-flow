@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 
 export default function Home() {
-  const [stats, setStats] = useState({ sentence_total: 0, sentence_ja: 0, sentence_es: 0, sentence_en: 0, word_total: 0, word_ja: 0, word_es: 0, word_en: 0, reviewed_today: 0 })
+  const [stats, setStats] = useState({ sentence_total: 0, sentence_ja: 0, sentence_es: 0, sentence_en: 0, word_total: 0, word_ja: 0, word_es: 0, word_en: 0, reviewed_today: 0, reviewed_sentences_today: 0, reviewed_words_today: 0 })
   useEffect(() => { api.get('/stats').then(setStats).catch(() => {}) }, [])
 
   return (
@@ -19,7 +19,7 @@ export default function Home() {
       </section>
 
       <section className="stats-grid" aria-label="学习统计">
-        <div className="stat stat-featured"><span>今日已复习</span><strong>{stats.reviewed_today}</strong><small>次主动回忆</small></div>
+        <div className="stat stat-featured"><span>今日作答</span><strong>{stats.reviewed_today}</strong><small>今日覆盖 {stats.reviewed_sentences_today} 个句子、{stats.reviewed_words_today} 个单词；共作答 {stats.reviewed_today} 次</small></div>
         <div className="stat"><span>句子总数</span><strong>{stats.sentence_total}</strong><small>{stats.sentence_ja} 日语 · {stats.sentence_es} 西语 · {stats.sentence_en} 英语</small></div>
         <div className="stat"><span>单词总数</span><strong>{stats.word_total}</strong><small>{stats.word_ja} 日语 · {stats.word_es} 西语 · {stats.word_en} 英语</small></div>
       </section>

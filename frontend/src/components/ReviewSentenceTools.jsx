@@ -6,7 +6,7 @@ import TagInput from './TagInput'
 
 const emptyWord = () => ({ word: '', meaning: '', notes: '', part_of_speech: '动词', tags: [] })
 
-export default function ReviewSentenceTools({ sentence, onUpdate, onDelete }) {
+export default function ReviewSentenceTools({ sentence, onUpdate, onDelete, onSavingChange }) {
   const [editingOriginal, setEditingOriginal] = useState(false)
   const [original, setOriginal] = useState(sentence.target_text)
   const [editingTranslation, setEditingTranslation] = useState(false)
@@ -20,6 +20,9 @@ export default function ReviewSentenceTools({ sentence, onUpdate, onDelete }) {
   const [confirmingTrash, setConfirmingTrash] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  useEffect(() => { onSavingChange?.(saving) }, [saving, onSavingChange])
+  useEffect(() => () => { onSavingChange?.(false) }, [onSavingChange])
 
   useEffect(() => {
     setEditingOriginal(false)

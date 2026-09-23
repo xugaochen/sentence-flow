@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getReviewStartNotice, removeCurrentAndFutureMatches, splitCurrentAndFutureMatches } from './reviewQueue.js'
+import { canLeaveReview, getReviewStartNotice, removeCurrentAndFutureMatches, splitCurrentAndFutureMatches } from './reviewQueue.js'
+
+test('a finished round can restart after the final assessment or skip leaves its duplicate-action lock set', () => {
+  const finished = { phase: 'done', actionPending: false, editorPending: false, actionLocked: true }
+  assert.equal(canLeaveReview(finished), true)
+  assert.equal(canLeaveReview({ ...finished, phase: 'review' }), false)
+  assert.equal(canLeaveReview({ ...finished, phase: 'review', actionLocked: false }), true)
+})
+
+test('pending assessment and sentence edits block ending a round, including completion races', () => {
+  for (const phase of ['review', 'done']) {
+    assert.equal(canLeaveReview({ phase, actionPending: true, editorPending: false, actionLocked: true }), false)
+    assert.equal(canLeaveReview({ phase, actionPending: false, editorPending: true, actionLocked: false }), false)
+  }
+})
 
 
 test('removing a repeated current item preserves history and removes future copies', () => {
