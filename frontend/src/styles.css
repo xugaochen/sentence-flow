@@ -153,6 +153,16 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); box-shado
 .review-mode-grid button b { font-size: 14px; }
 .review-mode-grid button small { margin-top: 7px; font-size: 11px; font-weight: 400; opacity: .8; }
 .review-mode-note { color: var(--muted); font-size: 12px; line-height: 1.8; margin: -10px 0 24px; }
+.prompt-language-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.prompt-language-options button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 48px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--muted); font-size: 13px; line-height: 1.5; text-align: left; }
+.prompt-language-options button:hover { border-color: var(--blue); color: var(--ink); }
+.prompt-language-options button.active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.prompt-language-check { display: grid; place-items: center; width: 17px; height: 17px; flex: 0 0 17px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; }
+.prompt-language-help { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.prompt-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+@media (max-width: 480px) {
+  .prompt-language-options { grid-template-columns: 1fr; gap: 8px; }
+}
 .review-today { padding: 13px 16px; margin: 0 0 26px; border-left: 2px solid var(--blue); background: #f0eee7; color: var(--muted); font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
 .review-today b { color: var(--ink); font-weight: 600; }
 .review-today small { display: block; font-size: 10px; }

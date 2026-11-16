@@ -3,14 +3,17 @@ import { Link } from 'react-router-dom'
 import { api, queryString } from '../api'
 import AnswerDiff from '../components/AnswerDiff'
 import ReviewSentenceTools from '../components/ReviewSentenceTools'
+import ReviewPrompt from '../components/ReviewPrompt'
 import SpeakButton from '../components/SpeakButton'
 import { Empty, ErrorMessage, Loading } from '../components/Status'
 import { LANGUAGES, PARTS_OF_SPEECH, PARTS_OF_SPEECH_EN } from '../constants'
 import { canLeaveReview, splitCurrentAndFutureMatches } from '../utils/reviewQueue'
+import { clearTrashNoticeOnAdvance, completeTrashNotice } from '../utils/reviewTrashNotice'
 import { getReviewShortcut } from '../utils/reviewShortcuts'
 import { normalizeAnswer } from '../utils/textDiff'
 import { useAppearance } from '../components/Appearance'
 import { reviewPromptLanguage, reviewPromptText } from '../utils/reviewPrompt'
+import { normalizePromptDisplay, readPromptDisplay, savePromptDisplay } from '../utils/promptDisplay'
 
 const REVIEW_MODES = [
   { value: 'recent', label: '近期巩固', englishLabel: 'Recent Practice', description: '练习最近 7 天还不熟悉的内容，以及从未复习且尚未掌握的内容。先覆盖今天没练过的题，再安排第二遍。' },
@@ -38,6 +41,12 @@ const emptyResults = () => ({ unknown: 0, fuzzy: 0, known: 0, skipped: 0 })
 
 export default function Review({ type }) {
   const { workbench } = useAppearance()
+  const [promptDisplay, setPromptDisplay] = useState(readPromptDisplay)
+  const changePromptDisplay = (value) => {
+    const next = normalizePromptDisplay(value)
+    setPromptDisplay(next)
+    savePromptDisplay(next)
+  }
   const isSentence = type === 'sentences'
   const [phase, setPhaseState] = useState('setup')
   const [settings, setSettings] = useState({ language: '', prompt_language: 'zh', part_of_speech: '', limit: '10', mode: 'recent' })
@@ -58,6 +67,7 @@ export default function Review({ type }) {
   const inputRef = useRef(null)
   const speakRef = useRef(null)
   const activeRunRef = useRef(0)
+  const trashRequestRef = useRef(0)
   const overviewRequestRef = useRef(0)
   const actionPendingRef = useRef(false)
   const itemsRef = useRef(items)
@@ -175,6 +185,7 @@ export default function Review({ type }) {
     setItems((previous) => previous.map((item) => item.id === updated.id ? updated : item))
   }
   const advance = (nextNotice = '') => {
+    setTrashStatus(clearTrashNoticeOnAdvance)
     if (index + 1 >= itemsRef.current.length) {
       setNotice(''); setPhase('done')
     } else {
@@ -191,10 +202,11 @@ export default function Review({ type }) {
   const removeCurrent = (sentence) => {
     if (actionPendingRef.current || editorPending) return
     const deletingRun = activeRunRef.current
+    const requestId = ++trashRequestRef.current
     const { remaining, removed } = splitCurrentAndFutureMatches(itemsRef.current, index, sentence.id)
     itemsRef.current = remaining
     setItems(remaining); setAnswer(''); setSubmitted(false); setError('')
-    setTrashStatus({ kind: 'pending', text: workbench ? 'Moving to trash. You can keep answering.' : '正在后台移至回收站，你可以继续作答。' })
+    setTrashStatus({ kind: 'pending', requestId, text: workbench ? 'Moving to trash. You can keep answering.' : '正在后台移至回收站，你可以继续作答。' })
     setQuestionInstance((value) => value + 1)
     if (index >= remaining.length) {
       setNotice(''); setPhase('done')
@@ -203,7 +215,7 @@ export default function Review({ type }) {
     }
     void api.delete(`/sentences/${sentence.id}`).then(() => {
       if (activeRunRef.current !== deletingRun) return
-      setTrashStatus({ kind: 'success', text: workbench ? 'The previous sentence was moved to trash.' : '上一句话已移至回收站。' })
+      setTrashStatus((status) => completeTrashNotice(status, requestId, workbench ? 'The previous sentence was moved to trash.' : '上一句话已移至回收站。'))
       if (phaseRef.current === 'done') void refreshOverview()
     }).catch((err) => {
       if (activeRunRef.current !== deletingRun) return
@@ -275,10 +287,9 @@ export default function Review({ type }) {
       {notice && <div className="success-banner">{notice}</div>}
       {trashStatus?.kind === 'error' ? <ErrorMessage message={trashStatus.text} /> : trashStatus && <div className="success-banner">{trashStatus.text}</div>}
       <section className="review-card">
-        <div className="review-label"><span>{workbench ? (promptLanguage === 'en' ? 'English Prompt' : 'Chinese Prompt') : promptLanguage === 'en' ? '英文提示' : isSentence ? '中文提示' : '中文意思'}</span><b>{workbench ? `Answer in ${LANGUAGES[current.language].englishLabel}` : LANGUAGES[current.language].label}</b></div>
-        <h1 lang={promptLanguage === 'en' ? 'en' : 'zh'}>{reviewPromptText(current, type, promptLanguage) || (workbench ? 'Translation missing. Skip this question and add a translation.' : '缺少译文，请跳过并补充翻译。')}</h1>
+        <ReviewPrompt text={reviewPromptText(current, type, promptLanguage)} promptLanguage={promptLanguage} language={current.language} isSentence={isSentence} display={promptDisplay} onDisplayChange={changePromptDisplay} />
         {!submitted ? <form key={`${type}-${current.id}-${index}-${questionInstance}`} onSubmit={submitAnswer} className="answer-form">
-          <label htmlFor="answer">{workbench ? 'Your Answer' : `请输入完整${LANGUAGES[current.language].label}${isSentence ? '句子' : ''}`}</label>
+          <label htmlFor="answer">{workbench ? promptDisplay.format === 'code' ? <code className="workspace-answer-variable"><span className="workspace-code-variable">{LANGUAGES[current.language].englishLabel.toLowerCase()}_answer</span><span className="workspace-code-operator"> =</span></code> : 'Your Answer' : `请输入完整${LANGUAGES[current.language].label}${isSentence ? '句子' : ''}`}</label>
           {isSentence ? <textarea id="answer" ref={inputRef} autoFocus rows="4" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={workbench ? 'Type your answer here…' : '在这里写下你的答案…'} /> : <input id="answer" ref={inputRef} autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder={workbench ? 'Type your answer here…' : '在这里写下你的答案…'} />}
           <p className="input-hint">{isSentence ? 'Ctrl/Cmd + Enter' : 'Enter / Ctrl/Cmd + Enter'} {workbench ? 'Submit' : '提交'} · Ctrl/Cmd + / {workbench ? 'Show Answer' : '查看答案'} · Ctrl/Cmd + Shift + Enter {workbench ? 'Skip' : '跳过'}</p>
           <button className="button button-primary button-wide" disabled={!answer.trim()}>{workbench ? 'Check Answer' : '提交答案'} <span>→</span></button>
@@ -330,7 +341,11 @@ function Setup({ isSentence, settings, setSettings, start, error, overview, over
     <form className="setup-card" onSubmit={start}>
       <ErrorMessage message={error} />
       <fieldset><legend>{workbench ? 'Language' : '语言'}</legend><div className="choice-row">{[['', { label: '全部', englishLabel: 'All' }], ...Object.entries(LANGUAGES)].map(([value, item]) => <button type="button" className={settings.language === value ? 'active' : ''} key={value || 'all'} onClick={() => setSettings({ ...settings, language: value })}>{workbench ? item.englishLabel : item.label}</button>)}</div></fieldset>
-      {isSentence && settings.language === 'es' && <fieldset><legend>{workbench ? 'Prompt Language' : '提示语言'}</legend><div className="choice-row">{[['zh', '中文 → 西语', 'Chinese → Spanish'], ['en', '英语 → 西语', 'English → Spanish']].map(([value, label, englishLabel]) => <button type="button" key={value} aria-pressed={settings.prompt_language === value} className={settings.prompt_language === value ? 'active' : ''} onClick={() => setSettings({ ...settings, prompt_language: value })}>{workbench ? englishLabel : label}</button>)}</div><p className="review-mode-note">{workbench ? 'Both prompt languages share your progress and daily limits.' : '两种提示方式共用熟练度、复习记录和每日次数。'}</p></fieldset>}
+      {isSentence && settings.language === 'es' && <fieldset className="prompt-language-field" aria-describedby="prompt-language-help">
+        <legend>{workbench ? 'Prompt Language' : '提示语言'}</legend>
+        <div className="prompt-language-options">{[['zh', '中文 → 西语', 'Chinese → Spanish'], ['en', '英语 → 西语', 'English → Spanish']].map(([value, label, englishLabel]) => <button type="button" key={value} aria-pressed={settings.prompt_language === value} className={settings.prompt_language === value ? 'active' : ''} onClick={() => setSettings({ ...settings, prompt_language: value })}><span>{workbench ? englishLabel : label}</span><span className="prompt-language-check" aria-hidden="true">{settings.prompt_language === value ? '✓' : ''}</span></button>)}</div>
+        <p className="prompt-language-help" id="prompt-language-help">{workbench ? 'Both prompt languages share your progress and daily limits.' : '两种提示方式共用熟练度、复习记录和每日次数。'}</p>
+      </fieldset>}
       {overview?.missing_english_count > 0 && <p className="review-mode-note" role="status">{workbench ? `${overview.missing_english_count} sentences have no English translation and are excluded. Add translations in the sentence editor or choose Chinese prompts.` : `${overview.missing_english_count} 条句子尚无英文翻译，已从英文提示模式中排除。可在句子编辑页补充，或改用中文提示。`}</p>}
       {!isSentence && <label><span>{workbench ? 'Part of Speech' : '词性'}</span><select value={settings.part_of_speech} onChange={(e) => setSettings({ ...settings, part_of_speech: e.target.value })}><option value="">{workbench ? 'All types' : '全部词性'}</option>{PARTS_OF_SPEECH.map((part) => <option key={part} value={part}>{workbench ? PARTS_OF_SPEECH_EN[part] : part}</option>)}</select></label>}
       <fieldset><legend>{workbench ? 'Review Mode' : '复习方式'}</legend><div className="review-mode-grid">{REVIEW_MODES.map((mode) => <button type="button" aria-pressed={settings.mode === mode.value} className={settings.mode === mode.value ? 'active' : ''} key={mode.value} onClick={() => setSettings({ ...settings, mode: mode.value })}><b>{workbench ? mode.englishLabel : mode.label}</b><small>{overviewLoading || !overview ? overviewError ? (workbench ? 'unavailable' : '暂时无法统计') : (workbench ? 'loading…' : '正在统计…') : workbench ? `${overview[mode.value].available_count} available` : `本轮可练 ${overview[mode.value].available_count} 题`}</small></button>)}</div></fieldset>
